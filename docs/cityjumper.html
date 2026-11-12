@@ -270,6 +270,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
   font-size: 1.2rem;
   cursor: pointer;
 }
+.pause-btn { right: calc(max(16px, env(safe-area-inset-right, 0px)) + 52px); }
 .musik-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
 /* Handy-Knöpfe: links/rechts unten links, Springen unten rechts */
@@ -454,6 +455,19 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
   <button id="skip" class="skip" type="button" hidden>⏭ Überspringen</button>
 
   <button id="musik-btn" class="musik-btn" type="button" aria-label="Musik an oder aus">🔊</button>
+  <button id="pause-btn" class="musik-btn pause-btn" type="button" aria-label="Pause" hidden>⏸</button>
+
+  <div id="pause" class="overlay" hidden>
+    <div class="card">
+      <h2>Pause</h2>
+      <p id="pause-stand">0 m · 🎁 0</p>
+      <div class="knoepfe">
+        <button id="weiter-btn" class="go gruen" type="button">▶ Weiter</button>
+        <button id="neustart-btn" class="go" type="button">↻ Neu starten</button>
+      </div>
+      <p class="hint nur-pc"><kbd>P</kbd> oder <kbd>Esc</kbd> = weiter</p>
+    </div>
+  </div>
 
   <div id="pad" hidden>
     <button id="k-links" class="pad-knopf links" type="button" aria-label="Links">◀</button>
@@ -1936,6 +1950,7 @@ function starteCityJumper() {
 
   // ===== Spielzustand =====
   let state = "start";
+  let pausiert = false;
   let zeit = 0, zeitFaktor = 1;
   let tempo = E.startTempo;
   const p = { x: 0, y: 22, z: 0, vx: 0, vy: 0 };
@@ -2706,6 +2721,8 @@ function starteCityJumper() {
 
   // ===== Hauptschleife =====
   function update(dtEcht) {
+    $("pause-btn").hidden = state !== "spiel" || pausiert;
+    if (pausiert) { $("pad").hidden = true; return; } // alles bleibt stehen
     zeit += dtEcht;
     const frost = power && power.typ.id === "frost";
     const ziel = state === "spiel" && fallschirmPrompt ? E.zeitlupe : state === "spiel" && frost ? 0.6 : 1;
@@ -2950,6 +2967,22 @@ function starteCityJumper() {
   $("laden-zu").addEventListener("click", schliesseLaden);
   $("skip").addEventListener("click", () => { if (state === "santa") zeigeVorbei(); });
 
+  // ===== Pause =====
+  function pause(an) {
+    if (an && state !== "spiel") return;
+    pausiert = an;
+    tasten.links = tasten.rechts = false;
+    $("pause").hidden = !an;
+    $("pause-stand").textContent = Math.floor(strecke) + " m · 🎁 " + gesammelt;
+    if (musik.ctx) { if (an) musik.ctx.suspend(); else if (stand.musik) musik.ctx.resume(); }
+    if (an) $("weiter-btn").focus({ preventScroll: true });
+    else letzteZeit = performance.now();
+  }
+  $("pause-btn").addEventListener("click", () => pause(true));
+  $("weiter-btn").addEventListener("click", () => pause(false));
+  $("neustart-btn").addEventListener("click", () => { pause(false); startGame(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && state === "spiel") pause(true); });
+
   window.addEventListener("keydown", e => {
     const k = e.key;
     if (!$("laden").hidden) {
@@ -2958,6 +2991,8 @@ function starteCityJumper() {
       return;
     }
     if (k === "G" && e.shiftKey) { stand.geschenke += 100; speichern(); hud(); return; } // Lehrer-Trick
+    if (k === "p" || k === "P" || k === "Escape") { if (pausiert) pause(false); else pause(true); e.preventDefault(); return; }
+    if (pausiert) { if (k === " ") { e.preventDefault(); pause(false); } return; }
     if (k === "ArrowLeft" || k === "a" || k === "A") { tasten.links = true; if (!e.repeat) drehen(-1); }
     if (k === "ArrowRight" || k === "d" || k === "D") { tasten.rechts = true; if (!e.repeat) drehen(1); }
     if (k === " " || k === "ArrowUp" || k === "w" || k === "W" || k === "Enter") {
@@ -3086,7 +3121,7 @@ function starteCityJumper() {
   const ersteBeruehrung = () => { musikStart(); window.removeEventListener("pointerdown", ersteBeruehrung); window.removeEventListener("keydown", ersteBeruehrung); };
   window.addEventListener("pointerdown", ersteBeruehrung);
   window.addEventListener("keydown", ersteBeruehrung);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (musik.ctx) musik.ctx.suspend(); } else if (stand.musik && musik.timer) musik.ctx.resume(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (musik.ctx) musik.ctx.suspend(); } else if (stand.musik && musik.timer && !pausiert) musik.ctx.resume(); });
 
   // Handy-Steuerung wählen: Knöpfe oder Wischen
   const mitKnoepfen = () => handy && stand.steuerung === "knoepfe";
