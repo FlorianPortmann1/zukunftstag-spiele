@@ -244,6 +244,19 @@ kbd {
 .steuerwahl button[aria-pressed="true"] { background: var(--eis); color: var(--nacht); }
 body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-knoepfe { display: none; }
 
+.skip {
+  position: absolute;
+  z-index: 7;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  font: 700 1.05rem var(--body);
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: 2px solid var(--gold);
+  background: rgba(11, 16, 48, 0.7);
+  color: var(--gold);
+  cursor: pointer;
+}
 .musik-btn {
   position: absolute;
   z-index: 6;
@@ -429,7 +442,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
     <div class="stat right"><span class="label">Rekord</span><span id="rekord" class="value">0 m</span></div>
   </div>
   <div class="extras" id="extras" hidden>
-    <span id="schirm-chip" class="chip">🪂 ×1</span>
+    <span id="schirm-chip" class="chip">❤️❤️❤️</span>
     <span id="schild-chip" class="chip" hidden>🛡️ ×0</span>
     <span id="power-chip" class="chip power" hidden><span id="power-text"></span><i id="power-balken"></i></span>
   </div>
@@ -438,6 +451,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
   <div id="dreh" class="ruf" hidden><span id="dreh-text">⬅ LINKS!</span><small><span class="nur-pc">PFEILTASTE DRÜCKEN</span><span class="nur-handy">IN DIE RICHTUNG LENKEN</span></small></div>
   <div id="hoho" class="ruf" hidden>HO HO HO!</div>
   <div id="powerruf" class="ruf" hidden></div>
+  <button id="skip" class="skip" type="button" hidden>⏭ Überspringen</button>
 
   <button id="musik-btn" class="musik-btn" type="button" aria-label="Musik an oder aus">🔊</button>
 
@@ -454,6 +468,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
       <h1>City Jumper</h1>
       <div class="untertitel">❄️ Weihnachts-Edition ❄️</div>
       <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und bösen Schneemännern aus. Bei den Pfeilen musst du abbiegen!</p>
+      <p>Du hast 3 ❤️. Wenn du abstürzt: schnell drücken, dann rettet dich der Fallschirm (kostet ein Herz). Seltene ❤️ auf den Dächern füllen auf.</p>
       <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen.</p>
       <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen.</span></p>
       <div class="steuerwahl"><span>Steuerung:</span><button type="button" data-steuer="knoepfe">🎮 Knöpfe</button><button type="button" data-steuer="wischen">👆 Wischen</button></div>
@@ -516,7 +531,8 @@ const EINSTELLUNGEN = {
   eckeAbMeter: 120,       // ab hier gibt es Kurven
   eckeAlle: [4, 7],       // nach so vielen Häusern kommt eine Kurve
   powerUpChance: 0.18,    // wie oft ein Weihnachts-Power-up auf einem Dach liegt
-  powerUpDauer: 6,        // Sekunden, die ein Power-up hält
+  powerUpDauer: 6,
+  herzChance: 0.04,       // wie oft ein Herz auf einem Dach liegt (ganz selten)        // Sekunden, die ein Power-up hält
   geschenkChance: 0.85,   // wie oft auf einem Dach Geschenke liegen
   magnetRadius: 7,        // so weit zieht der Magnet Geschenke an
   feuerwerkPause: 2.2,    // Sekunden zwischen zwei Feuerwerken (ungefähr)
@@ -569,7 +585,7 @@ const POWERUPS = [
   { id: "magnet", name: "Geschenk-Magnet", preis: 120, icon: "🧲", selten: "selten", info: "Zieht Geschenke an (an/aus)" },
   { id: "schild", name: "Schutzschild", preis: 30, icon: "🛡️", selten: "gewoehnlich", info: "Fängt einen Zusammenstoss ab", verbrauch: "schilde" },
   // Weihnachten (limitiert)
-  { id: "fallschirm2", name: "Zweiter Fallschirm", preis: 150, icon: "🪂", selten: "legendaer", limitiert: true, info: "Zwei Rettungen pro Lauf" },
+  { id: "fallschirm2", name: "Extra-Herz", preis: 150, icon: "💖", selten: "legendaer", limitiert: true, info: "Starte mit 4 Leben statt 3" },
   { id: "rentierstart", name: "Rentier-Start", preis: 40, icon: "🛷", selten: "selten", limitiert: true, info: "Der nächste Lauf startet mit Rentierflug", verbrauch: "rentierStarts" },
   { id: "verlaengerung", name: "Glühwein-Uhr", preis: 120, icon: "⏳", selten: "episch", limitiert: true, info: "Power-ups auf dem Dach halten 50 % länger" }
 ];
@@ -582,6 +598,9 @@ const DACH_POWERUPS = [
   { id: "frost", icon: "❄️", name: "FROSTZEIT!", farbe: 0x9be7ff },
   { id: "doppel", icon: "🎁", name: "DOPPELTE GESCHENKE!", farbe: 0xff3b4f }
 ];
+
+// Ein Herz gibt ein Leben zurück
+const HERZ = { id: "herz", icon: "❤️", name: "+1 LEBEN!", farbe: 0xff3355 };
 
 const SELTEN_NAME = { gewoehnlich: "Gewöhnlich", selten: "Selten", episch: "Episch", legendaer: "Legendär" };
 
@@ -1627,6 +1646,7 @@ function starteCityJumper() {
       }
       // Weihnachts-Power-up
       if (vorher && Math.random() < E.powerUpChance) neuesPickup(seg, waehle([-1.8, 0, 1.8]), top + 1.1, rand(z1 + 2, z0 - 2));
+      else if (vorher && Math.random() < E.herzChance) neuesPickup(seg, waehle([-1.8, 0, 1.8]), top + 1.1, rand(z1 + 2, z0 - 2), HERZ);
     }
     // Geschenk-Bogen über der Lücke (zeigt, wie man springt)
     if (vorher && Math.random() < 0.5) {
@@ -1671,8 +1691,8 @@ function starteCityJumper() {
   }
 
   // ===== Weihnachts-Power-ups auf dem Dach =====
-  function neuesPickup(seg, x, y, z) {
-    const typ = waehle(DACH_POWERUPS);
+  function neuesPickup(seg, x, y, z, festerTyp) {
+    const typ = festerTyp || waehle(DACH_POWERUPS);
     const g = new THREE.Group();
     const bild = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur(typ.icon), transparent: true, depthWrite: false }));
     bild.scale.set(1.3, 1.3, 1);
@@ -1923,7 +1943,7 @@ function starteCityJumper() {
   let spielerWinkel = 0;
   let amBoden = true, coyote = 0, sprungPuffer = 0, doppelBenutzt = false, drehPuffer = null;
   let anWand = false, geschleudert = 0, unverwundbar = 0;
-  let fallschirme = 1, schirmAn = false, schirmOben = false, schirmZiel = null, schirmZeit = 0;
+  let leben = 3, maxLeben = 3, schirmAn = false, schirmOben = false, schirmZiel = null, schirmZeit = 0;
   let fallschirmPrompt = false, sturzStart = null;
   let laufPhase = 0, gesammelt = 0;
   let power = null; // { typ, rest, dauer }
@@ -1958,7 +1978,8 @@ function starteCityJumper() {
     Object.assign(p, { x: 0, y: gebaeude[0].top, z: 0, vx: 0, vy: 0 });
     amBoden = true; coyote = 0; sprungPuffer = 0; doppelBenutzt = false; drehPuffer = null;
     anWand = false; geschleudert = 0; unverwundbar = 0;
-    fallschirme = hat("fallschirm2") ? 2 : 1;
+    maxLeben = hat("fallschirm2") ? 4 : 3;
+    leben = maxLeben;
     schirmAn = false; schirmOben = false; schirmZiel = null;
     fallschirmPrompt = false; sturzStart = null;
     schirm.visible = false;
@@ -2056,7 +2077,7 @@ function starteCityJumper() {
 
   function oeffneSchirm() {
     fallschirmPrompt = false;
-    fallschirme--;
+    leben--;
     schirmZiel = gebaeude.find(b => b.segs.includes(pSeg) && b.z1 < p.z - 12) || null;
     if (!schirmZiel) {
       // an einer Kurve vorbeigerannt? Dann bringt dich der Wind ums Eck
@@ -2142,6 +2163,17 @@ function starteCityJumper() {
   }
 
   let powerRufTimer = null;
+  function herzSammeln() {
+    leben = Math.min(maxLeben, leben + 1);
+    const r = $("powerruf");
+    r.textContent = "❤️ +1 LEBEN!";
+    r.hidden = false;
+    r.style.animation = "none"; void r.offsetWidth; r.style.animation = "";
+    clearTimeout(powerRufTimer);
+    powerRufTimer = setTimeout(() => { r.hidden = true; }, 1400);
+    explosion(pw.x, pw.y + 1, pw.z, 0xff3355, 60, 8, 1, 0.9);
+    hud();
+  }
   function aktivierePower(typ) {
     const dauer = E.powerUpDauer * (hat("verlaengerung") ? 1.5 : 1) * (typ.id === "rentierflug" ? 0.8 : 1);
     power = { typ, rest: dauer, dauer };
@@ -2172,11 +2204,13 @@ function starteCityJumper() {
     const P = santa.P, s = pSeg;
     // Punkt relativ zum Spieler: r = rechts, u = hoch, f = vorwärts
     const relativ = (ziel, r, u, f) => ziel.set(P.x + s.rx * r + s.fx * f, P.y + u, P.z + s.rz * r + s.fz * f);
+    // Flugbahn von oben und wieder steil nach oben, damit der Schlitten nicht durch Häuser fliegt
     relativ(santa.F, 0, -schlitten.sitz.y * SCHLITTEN_GROESSE, 0);
-    relativ(santa.S, -40, 14, -26);
-    relativ(santa.C1, -16, -7, -8);
-    santa.C2.copy(santa.F).multiplyScalar(2).sub(santa.C1);
-    relativ(santa.Z, 40, 30, 50);
+    relativ(santa.S, 0, 70, -30);
+    relativ(santa.C1, 0, 22, -2);
+    relativ(santa.C2, 0, 32, 4);
+    relativ(santa.Z, 0, 115, 60);
+    $("skip").hidden = false;
     schlitten.gruppe.visible = true;
     bezier(santa.S, santa.C1, santa.F, 0, schlitten.gruppe.position);
     schirm.visible = false;
@@ -2256,6 +2290,7 @@ function starteCityJumper() {
 
   function zeigeVorbei() {
     state = "vorbei";
+    $("skip").hidden = true;
     $("hoho").hidden = true;
     const m = Math.floor(strecke);
     const neu = m > rekord;
@@ -2445,7 +2480,7 @@ function starteCityJumper() {
       else if (!b) { const v = gebaeudeVorne(p.z); verloren = !v || p.y < v.top - 0.45; }
     }
     if (verloren && sturzStart === null) sturzStart = p.y;
-    fallschirmPrompt = verloren && fallschirme > 0;
+    fallschirmPrompt = verloren && leben > 0;
     wpos(pSeg, p.x, p.y, p.z, pw);
     if ((verloren && p.y < sturzStart - 7) || p.y < 2) { startSanta(); return; }
 
@@ -2512,7 +2547,7 @@ function starteCityJumper() {
       if (pu.g.position.distanceTo(tmpV.set(pw.x, pw.y + 1, pw.z)) < 1.6) {
         pu.weg = true;
         scene.remove(pu.g);
-        aktivierePower(pu.typ);
+        if (pu.typ === HERZ) herzSammeln(); else aktivierePower(pu.typ);
       }
     }
 
@@ -2628,8 +2663,9 @@ function starteCityJumper() {
     } else {
       // Weihnachtsmann von nah anschauen
       const pos = schlitten.gruppe.position, s = santa.seg;
-      if (santa.t < 2.0) kamZiel.set(santa.P.x - s.fx * 9 + s.rx * 5, santa.P.y + 2.5, santa.P.z - s.fz * 9 + s.rz * 5);
-      else kamZiel.set(pos.x - s.fx * 10 - s.rx * 6, pos.y + 2, pos.z - s.fz * 10 - s.rz * 6);
+      // Kamera bleibt über den Dächern, damit sie nicht in einem Haus steckt
+      if (santa.t < 2.0) kamZiel.set(santa.P.x - s.fx * 7 + s.rx * 6, santa.P.y + 11, santa.P.z - s.fz * 7 + s.rz * 6);
+      else kamZiel.set(pos.x - s.fx * 12 + s.rx * 8, Math.max(pos.y + 5, santa.P.y + 11), pos.z - s.fz * 12 + s.rz * 8);
       camera.position.lerp(kamZiel, Math.min(1, dt * (santa.t < 2 ? 3 : 1.8)));
       kamBlick.copy(pos);
       kamBlick.y += 1.5;
@@ -2707,15 +2743,14 @@ function starteCityJumper() {
   // ===== Anzeige =====
   let hudCache = "";
   function hud() {
-    const t = [Math.floor(strecke), stand.geschenke, Math.round(tempo * 3.6), rekord, fallschirme, stand.schilde, state].join("|");
+    const t = [Math.floor(strecke), stand.geschenke, Math.round(tempo * 3.6), rekord, leben, maxLeben, stand.schilde, state].join("|");
     if (t === hudCache) return;
     hudCache = t;
     $("meter").textContent = Math.floor(strecke) + " m";
     $("geschenke").textContent = "🎁 " + stand.geschenke;
     $("tempo").textContent = (state === "spiel" ? Math.round(tempo * 3.6) : 0) + " km/h";
     $("rekord").textContent = rekord + " m";
-    $("schirm-chip").textContent = "🪂 ×" + fallschirme;
-    $("schirm-chip").classList.toggle("weg", fallschirme <= 0);
+    $("schirm-chip").textContent = "❤️".repeat(Math.max(0, leben)) + "🖤".repeat(Math.max(0, maxLeben - leben));
     $("schild-chip").hidden = stand.schilde <= 0;
     $("schild-chip").textContent = "🛡️ ×" + stand.schilde;
     $("beutel-start").textContent = "🎁 " + stand.geschenke + " Geschenke im Beutel";
@@ -2913,6 +2948,7 @@ function starteCityJumper() {
   $("laden-btn-1").addEventListener("click", oeffneLaden);
   $("laden-btn-2").addEventListener("click", oeffneLaden);
   $("laden-zu").addEventListener("click", schliesseLaden);
+  $("skip").addEventListener("click", () => { if (state === "santa") zeigeVorbei(); });
 
   window.addEventListener("keydown", e => {
     const k = e.key;
@@ -2929,6 +2965,7 @@ function starteCityJumper() {
       e.preventDefault();
       if (e.repeat) return;
       if (state === "spiel") aktion();
+      else if (state === "santa") zeigeVorbei();
       else if (state === "start" && !$("start").hidden) startGame();
       else if (state === "vorbei" && !$("over").hidden) startGame();
     }
