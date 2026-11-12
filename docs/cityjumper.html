@@ -1925,6 +1925,12 @@ function starteCityJumper() {
       else for (const x of belegt) neuesMoebel(b, typ, x, z);
       for (let k = 0; k < 3; k++) neuesGeschenk(b.seg, frei, b.boden + 0.8, z + 3 - k * 2);
     }
+    // Oben auf dem Dach (für alle, die übers Loch springen): Hindernisse und Geschenke
+    for (let z = b.lochHinten - 8; z > b.z1 + 5; z -= rand(10, 14)) {
+      neuesHindernis(b, z, 999);
+      const spur = waehle([-2, 0, 2]);
+      for (let k = 0; k < 3; k++) neuesGeschenk(b.seg, spur, b.top + 0.8, z - 4 - k * 2);
+    }
   }
 
   function gebaeudeWeg(b) {
