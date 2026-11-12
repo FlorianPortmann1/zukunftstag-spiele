@@ -1829,7 +1829,7 @@ function starteCityJumper() {
       // Hängelampe: drunter durchrutschen!
       hx = 0.9; hz = 0.4; unten = 1.05; h = 4.5;
       const kabel = zylinder(0.03, 0.03, 2.6, std(0x222222), 6); kabel.position.y = 3.2; g.add(kabel);
-      const schirm_ = kegel(0.9, 0.7, std(0xffd34d, { emissive: 0xaa7700, emissiveIntensity: 0.5, side: THREE.DoubleSide }), 16); schirm_.position.y = 1.6; g.add(schirm_);
+      const schirm_ = kegel(0.9, 0.7, std(0xffd34d, { emissive: 0xaa7700, emissiveIntensity: 0.5, side: THREE.DoubleSide, transparent: true, opacity: 0.5, depthWrite: false }), 16); schirm_.position.y = 1.6; g.add(schirm_);
       const birne = new THREE.Sprite(glowMat(0xffe6a0)); birne.scale.set(2.2, 2.2, 1); birne.position.y = 1.3; g.add(birne);
       const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false })); pf.scale.set(0.8, 0.8, 1); pf.position.set(0, 0.5, 0.3); g.add(pf);
     }
@@ -2042,8 +2042,9 @@ function starteCityJumper() {
       x = 0;
       hx = b.halb; hz = 0.3; unten = 1.05; h = 3.6;
       for (const s of [-1, 1]) { const p = box(0.22, 3.6, 0.22, pfostenMat); p.position.set(s * (b.halb - 0.15), 1.8, 0); g.add(p); }
-      const balken = box(b.halb * 2, 2.5, 0.2, std(0x7a0f1c)); balken.position.y = 2.33; g.add(balken);
-      const schild = new THREE.Mesh(schildGeo, waehle(SCHILDER));
+      const balken = box(b.halb * 2, 2.5, 0.2, std(0x7a0f1c, { transparent: true, opacity: 0.45, depthWrite: false })); balken.position.y = 2.33; g.add(balken); // leicht durchsichtig
+      const schildMat = waehle(SCHILDER).clone(); schildMat.opacity = 0.75;
+      const schild = new THREE.Mesh(schildGeo, schildMat);
       schild.scale.set(Math.min(1, (b.halb * 2 - 0.6) / 6.4), 1.2, 1);
       schild.position.set(0, 2.2, 0.12); g.add(schild);
       for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(kugelGeo, waehle(kugelMats)); l.scale.setScalar(1.6); l.position.set(-b.halb + 0.4 + i * (b.halb * 2 - 0.8) / 9, 1.08, 0.12); g.add(l); }
