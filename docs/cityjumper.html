@@ -329,6 +329,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
 .laden-kopf { display: flex; align-items: center; gap: 12px; }
 .laden-kopf h3 { font-size: clamp(1.3rem, 6vw, 2.2rem); color: var(--ink); flex: 1; }
 .beutel { font-weight: 700; font-size: 1.2rem; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--gold); color: var(--gold); font-variant-numeric: tabular-nums; }
+.geld { font: 700 0.85rem var(--body); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--gold); background: rgba(255, 211, 77, 0.15); color: var(--gold); cursor: pointer; }
 .zu { font: 700 1.4rem var(--body); width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--eis); background: transparent; color: var(--ink); cursor: pointer; }
 .tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; touch-action: pan-x; }
 .tab {
@@ -497,7 +498,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
     <div class="card">
       <h1>City Jumper</h1>
       <div class="untertitel">❄️ Weihnachts-Edition ❄️</div>
-      <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und bösen Schneemännern aus. Bei den Pfeilen musst du abbiegen!</p>
+      <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Geschenkbergen, Bannern und bösen Schneemännern aus. Bei den Pfeilen musst du abbiegen!</p>
       <p>Du hast 3 ❤️. Wenn du abstürzt: schnell drücken, dann rettet dich der Fallschirm (kostet ein Herz). Seltene ❤️ auf den Dächern füllen auf.</p>
       <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen, <kbd>↓</kbd> = rutschen.</p>
       <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen, ⬇ = rutschen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen. Nach unten wischen = rutschen.</span></p>
@@ -507,6 +508,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
         <button id="laden-btn-1" class="go gruen" type="button">🛒 Itemshop</button>
       </div>
       <p id="beutel-start" class="hint">🎁 0 Geschenke im Beutel</p>
+      <button id="geld-btn-2" class="geld" type="button" title="+100 Geschenke">💰 +100</button>
       <p id="load-error" class="fehler" hidden>Die 3D-Grafik konnte nicht geladen werden. Prüf die Internetverbindung und lade die Seite neu.</p>
     </div>
   </div>
@@ -533,6 +535,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
       <div class="laden-kopf">
         <h3>🛒 Itemshop</h3>
         <span id="beutel" class="beutel">🎁 0</span>
+        <button id="geld-btn" class="geld" type="button" title="+100 Geschenke">💰 +100</button>
         <button id="laden-zu" class="zu" type="button" aria-label="Itemshop schliessen">✕</button>
       </div>
       <div class="tabs" id="tabs" role="tablist"></div>
@@ -1677,7 +1680,7 @@ function starteCityJumper() {
         }
       }
       // Hindernisse und Gegner
-      if (vorher && dist > E.mobAbMeter && !b.portal) {
+      if (vorher && dist > E.mobAbMeter && !b.portal && !vorher.ecke) { // nach einer Kurve: freies Dach
         const plaetze = [];
         const n = Math.min(4, Math.floor(rand(1, E.hindernisseProDach + 1 + diff * 2)));
         for (let k = 0; k < n; k++) {
@@ -1977,7 +1980,7 @@ function starteCityJumper() {
   const boeseMat = leucht(0xff2233, 2);
 
   function neuerMob(b, z, dist) {
-    const typ = dist < 250 ? waehle(["taube", "roboter"]) : waehle(["taube", "roboter", "drohne"]);
+    const typ = waehle(["taube", "roboter"]); // keine Drohnen mehr
     const g = new THREE.Group();
     const teile = {};
     let radius = 0.6;
@@ -3362,6 +3365,8 @@ function starteCityJumper() {
   $("laden-btn-1").addEventListener("click", oeffneLaden);
   $("laden-btn-2").addEventListener("click", oeffneLaden);
   $("laden-zu").addEventListener("click", schliesseLaden);
+  // Geld-Knopf: jedes Mal +100 Geschenke
+  for (const id of ["geld-btn", "geld-btn-2"]) $(id).addEventListener("click", () => { stand.geschenke += 100; speichern(); if (!$("laden").hidden) zeigeLaden(); else hud(); });
   $("skip").addEventListener("click", () => { if (state === "santa") zeigeVorbei(); });
 
   // ===== Pause =====
