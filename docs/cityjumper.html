@@ -453,7 +453,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
     <div class="card">
       <h1>City Jumper</h1>
       <div class="untertitel">❄️ Weihnachts-Edition ❄️</div>
-      <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und Laserzäunen aus. Bei den Pfeilen musst du abbiegen!</p>
+      <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und bösen Schneemännern aus. Bei den Pfeilen musst du abbiegen!</p>
       <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen.</p>
       <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen.</span></p>
       <div class="steuerwahl"><span>Steuerung:</span><button type="button" data-steuer="knoepfe">🎮 Knöpfe</button><button type="button" data-steuer="wischen">👆 Wischen</button></div>
@@ -880,24 +880,70 @@ function starteCityJumper() {
     mondScheibe.lookAt(0, 0, 0);
     himmel.add(mondScheibe);
   }
-  const nordlichtGeo = new THREE.PlaneGeometry(520, 70, 80, 1);
-  const nordlichtBasis = nordlichtGeo.attributes.position.array.slice();
-  {
+  // Nordlicht: zwei wellige Ringe rund um den ganzen Himmel (hört nirgends auf)
+  const nordlichter = [];
+  function nordlichtRing(radius, hoehe, y, oben, mitte, unten, phase) {
+    const geo = new THREE.CylinderGeometry(radius, radius, hoehe, 180, 1, true);
+    const pos = geo.attributes.position;
+    const basis = pos.array.slice();
+    const winkel = [], farben = [];
+    for (let i = 0; i < pos.count; i++) {
+      const a = Math.atan2(basis[i * 3 + 2], basis[i * 3]);
+      winkel.push(a);
+      // Vorhänge: mal hell, mal fast weg
+      const hell = Math.pow(Math.max(0, Math.sin(a * 3 + phase) * 0.6 + Math.sin(a * 7 + phase * 2) * 0.4 + 0.35), 1.4);
+      farben.push(hell, hell, hell);
+    }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(farben, 3));
     const [cv, c] = leinwand(4, 128);
     const g = c.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, "rgba(180,80,255,0)");
-    g.addColorStop(0.45, "rgba(140,90,255,0.35)");
-    g.addColorStop(0.85, "rgba(60,255,160,0.6)");
-    g.addColorStop(1, "rgba(60,255,160,0)");
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.4, oben);
+    g.addColorStop(0.8, mitte);
+    g.addColorStop(0.92, unten);
+    g.addColorStop(1, "rgba(0,0,0,0)");
     c.fillStyle = g;
     c.fillRect(0, 0, 4, 128);
-    const nordlicht = new THREE.Mesh(nordlichtGeo, new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false, fog: false,
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(cv), vertexColors: true, transparent: true, depthWrite: false, fog: false,
       blending: THREE.AdditiveBlending, side: THREE.DoubleSide
     }));
-    nordlicht.position.set(30, 120, -380);
-    himmel.add(nordlicht);
+    mesh.position.y = y;
+    mesh.renderOrder = -5;
+    himmel.add(mesh);
+    nordlichter.push({ mesh, geo, basis, winkel, radius, phase });
   }
+  nordlichtRing(380, 80, 125, "rgba(140,90,255,0.4)", "rgba(60,255,160,0.65)", "rgba(120,255,200,0.5)", 0);
+  nordlichtRing(410, 60, 165, "rgba(255,80,200,0.3)", "rgba(150,90,255,0.45)", "rgba(80,200,255,0.35)", 2);
+
+  // Skyline: ganz hinten am Horizont geht die Stadt weiter, in alle Richtungen
+  const skyline = new THREE.Group();
+  scene.add(skyline);
+  function skylineRing(radius, hoehe, fassade, fenster, seed) {
+    const [cv, c] = leinwand(2048, 256);
+    let x = 0;
+    while (x < 2048) {
+      const w = rand(18, 70), h = rand(50, 240) * (Math.random() < 0.1 ? 1.1 : 0.8);
+      c.fillStyle = fassade;
+      c.fillRect(x, 256 - h, w, h);
+      if (Math.random() < 0.2) { c.fillRect(x + w / 2 - 2, 256 - h - 24, 4, 24); c.fillStyle = "#ff3355"; c.fillRect(x + w / 2 - 3, 256 - h - 28, 6, 6); }
+      if (Math.random() < 0.15) { c.fillStyle = fassade; c.beginPath(); c.moveTo(x, 256 - h); c.lineTo(x + w / 2, 256 - h - w * 0.6); c.lineTo(x + w, 256 - h); c.fill(); }
+      for (let fy = 256 - h + 6; fy < 250; fy += 9) for (let fx = x + 4; fx < x + w - 4; fx += 7) {
+        if (Math.random() < 0.3) { c.fillStyle = waehle(fenster); c.fillRect(fx, fy, 3, 4); }
+      }
+      x += w + rand(0, 6);
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.x = 3;
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, hoehe, 64, 1, true),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, fog: false, side: THREE.DoubleSide, depthWrite: false }));
+    ring.position.y = hoehe / 2 - 3;
+    ring.rotation.y = seed;
+    skyline.add(ring);
+  }
+  skylineRing(340, 95, "#2a2462", ["rgba(255,210,120,0.55)", "rgba(155,231,255,0.45)", "rgba(255,138,216,0.45)"], 0);
+  skylineRing(275, 80, "#1b1844", ["rgba(255,210,120,0.85)", "rgba(155,231,255,0.7)", "rgba(255,59,79,0.7)", "rgba(61,255,138,0.6)"], 1.7);
 
   // ===== Boden: Strassen mit Leuchtlinien, verschneite Trottoirs und Parks =====
   const KACHEL = 64; // eine Strassen-Kachel ist 64 m gross
@@ -1520,7 +1566,7 @@ function starteCityJumper() {
       if (ecke && s === ecke) continue;
       if (bisEcke <= 2 && s === naechsteRichtung && dist > E.eckeAbMeter - 40) continue;
       kulissenHaus(b, s, rand(z1 + 2, z0 - 2));
-      if (laenge > 18 && Math.random() < 0.5) kulissenHaus(b, s, rand(z1 + 2, z0 - 2));
+      if (!handy || laenge > 18) kulissenHaus(b, s, rand(z1 + 2, z0 - 2));
     }
     ohneSeite = 0;
 
@@ -1696,7 +1742,8 @@ function starteCityJumper() {
   }
   // Hindernisse stehen still. Kiste und Laser: drüberspringen. Kamin und Schneemann: ausweichen.
   function neuesHindernis(b, z, dist) {
-    const typ = waehle(dist < 200 ? ["kiste", "kiste", "kamin", "laser"] : ["kiste", "kamin", "laser", "laser", "schneemann"]);
+    // Laser und Kamine waren zu nervig, darum nur noch Kisten und Schneemänner
+    const typ = waehle(dist < 200 ? ["kiste"] : ["kiste", "kiste", "schneemann"]);
     const g = new THREE.Group();
     let x = waehle([-2, 0, 2]), hx = 0.7, hz = 0.6, h = 0.8;
     if (typ === "kiste") {
@@ -1847,6 +1894,15 @@ function starteCityJumper() {
   miniSchlitten.traverse(o => { if (o.isPointLight) o.intensity = 1; });
   miniSchlitten.visible = false;
   spieler.add(miniSchlitten);
+  // Weihnachtsmann, der ab und zu hinten am Himmel vorbeifliegt
+  const himmelSchlitten = schlitten.gruppe.clone();
+  himmelSchlitten.scale.setScalar(3.5);
+  himmelSchlitten.traverse(o => { if (o.isPointLight) o.intensity = 0; });
+  himmelSchlitten.visible = false;
+  scene.add(himmelSchlitten);
+  const himmelsSanta = { aktiv: false, timer: 10, t: 0, start: new THREE.Vector3(), ende: new THREE.Vector3() };
+  const schnuppen = [];
+  let schnuppenTimer = 2, naechsterMeilenstein = 250;
 
   const santa = { t: 0, S: new THREE.Vector3(), C1: new THREE.Vector3(), F: new THREE.Vector3(), C2: new THREE.Vector3(), Z: new THREE.Vector3(), gefangen: false, P: new THREE.Vector3(), seg: null };
   function bezier(a, b, c, t, ziel) {
@@ -1922,6 +1978,7 @@ function starteCityJumper() {
     spielerZuruecksetzen();
     state = "spiel";
     tempo = E.startTempo;
+    naechsterMeilenstein = 250;
     camera.position.set(0, p.y + 3.4, 7.5);
     blickJetzt.set(0, p.y + 1.2, -8);
     $("start").hidden = true;
@@ -2108,6 +2165,8 @@ function starteCityJumper() {
     fallschirmPrompt = false;
     santa.t = 0;
     santa.gefangen = false;
+    santa.flip1 = santa.flip2 = false;
+    $("hoho").textContent = "HO HO HO!";
     santa.seg = pSeg;
     santa.P.copy(pw);
     const P = santa.P, s = pSeg;
@@ -2130,7 +2189,7 @@ function starteCityJumper() {
   const blick = new THREE.Vector3();
   function santaUpdate(dt) {
     santa.t += dt;
-    const T1 = 2.0, T2 = 5.6;
+    const T1 = 2.0, T2 = 7.2;
     const pos = schlitten.gruppe.position;
     if (santa.t < T1) {
       const u = santa.t / T1;
@@ -2161,6 +2220,27 @@ function starteCityJumper() {
       bezier(santa.F, santa.C2, santa.Z, e + 0.03, blick);
     }
     schlitten.gruppe.lookAt(blick);
+    // Stunts: zuerst ein Doppel-Flip (Fassrolle), dann ein Looping
+    if (santa.gefangen) {
+      const u = clamp((santa.t - T1) / (T2 - T1), 0, 1);
+      const weich = x => x * x * (3 - 2 * x);
+      const roll = clamp((u - 0.12) / 0.3, 0, 1), loop = clamp((u - 0.5) / 0.32, 0, 1);
+      schlitten.gruppe.rotateZ(weich(roll) * Math.PI * 4);
+      schlitten.gruppe.rotateX(-weich(loop) * Math.PI * 2);
+      const ruf = text => {
+        const h = $("hoho");
+        h.textContent = text; h.hidden = false;
+        h.style.animation = "none"; void h.offsetWidth; h.style.animation = "";
+        explosion(pos.x, pos.y + 2, pos.z, c => c.setHSL(Math.random(), 1, 0.6), 80, 12, 2, 1);
+      };
+      if (roll > 0 && !santa.flip1) { santa.flip1 = true; ruf("DOPPEL-FLIP! 🤸"); }
+      if (loop > 0 && !santa.flip2) { santa.flip2 = true; ruf("LOOPING! 🎢"); }
+      // Regenbogen-Spur während der Stunts
+      if (roll > 0 && roll < 1 || loop > 0 && loop < 1) for (let i = 0; i < 8; i++) {
+        tmpFarbe.setHSL((zeit * 2 + i / 8) % 1, 1, 0.6);
+        funken.neu(pos.x + rand(-1, 1), pos.y + rand(0, 2), pos.z + rand(-1, 1), 0, 0, 0, tmpFarbe, 1.2, 0);
+      }
+    }
     for (const r of schlitten.rentiere) {
       const s = Math.sin(zeit * 14 + r.phase);
       r.beine[0].rotation.x = s * 0.8; r.beine[1].rotation.x = s * 0.8;
@@ -2233,6 +2313,45 @@ function starteCityJumper() {
         }
         raketen.splice(i, 1);
       }
+    }
+    // Sternschnuppen
+    schnuppenTimer -= dt;
+    if (schnuppenTimer <= 0 && !reduceMotion) {
+      schnuppenTimer = rand(2, 5);
+      const a = rand(0, Math.PI * 2), r = rand(120, 190);
+      schnuppen.push({ x: camera.position.x + Math.cos(a) * r, y: rand(90, 150), z: camera.position.z + Math.sin(a) * r, vx: rand(-70, 70), vy: rand(-28, -12), vz: rand(-70, 70), t: 0 });
+    }
+    for (let i = schnuppen.length - 1; i >= 0; i--) {
+      const s = schnuppen[i];
+      s.t += dt;
+      s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+      tmpFarbe.setRGB(1, 1, 0.85);
+      feuerwerk.neu(s.x, s.y, s.z, 0, 0, 0, tmpFarbe, 0.7, 0);
+      if (s.t > 1.3) schnuppen.splice(i, 1);
+    }
+    // Weihnachtsmann am Himmel
+    const hs = himmelsSanta;
+    if (!hs.aktiv) {
+      hs.timer -= dt;
+      if (hs.timer <= 0 && (state === "spiel" || state === "start")) {
+        const s = pSeg || segmente[0], f = rand(110, 160), y = rand(60, 80);
+        hs.start.set(pw.x + s.fx * f - s.rx * 200, y, pw.z + s.fz * f - s.rz * 200);
+        hs.ende.set(pw.x + s.fx * f + s.rx * 200, y + 20, pw.z + s.fz * f + s.rz * 200);
+        if (Math.random() < 0.5) { const t = hs.start.clone(); hs.start.copy(hs.ende); hs.ende.copy(t); }
+        hs.aktiv = true; hs.t = 0;
+        himmelSchlitten.visible = true;
+      }
+    } else {
+      hs.t += dt / 9;
+      himmelSchlitten.position.lerpVectors(hs.start, hs.ende, hs.t);
+      himmelSchlitten.position.y += Math.sin(hs.t * 12) * 2;
+      himmelSchlitten.lookAt(hs.ende);
+      for (let i = 0; i < 3; i++) {
+        tmpFarbe.setHSL(rand(0.1, 0.15), 1, 0.7);
+        const q = himmelSchlitten.position;
+        feuerwerk.neu(q.x + rand(-2, 2), q.y + rand(0, 2), q.z + rand(-2, 2), 0, -1, 0, tmpFarbe, 1.6, 0);
+      }
+      if (hs.t >= 1) { hs.aktiv = false; himmelSchlitten.visible = false; hs.timer = rand(20, 35); }
     }
   }
 
@@ -2357,6 +2476,17 @@ function starteCityJumper() {
     figur.gruppe.visible = unverwundbar > 0 && !schirmAn ? Math.floor(zeit * 14) % 2 === 0 : true;
 
     strecke = Math.max(strecke, -p.z);
+    // Meilenstein: alle 250 m ein Feuerwerk
+    if (strecke >= naechsterMeilenstein) {
+      const r = $("powerruf");
+      r.textContent = "🎉 " + naechsterMeilenstein + " m!";
+      r.hidden = false;
+      r.style.animation = "none"; void r.offsetWidth; r.style.animation = "";
+      clearTimeout(powerRufTimer);
+      powerRufTimer = setTimeout(() => { r.hidden = true; }, 1400);
+      for (let i = 0; i < 3; i++) setTimeout(() => rakete(true), i * 200);
+      naechsterMeilenstein += 250;
+    }
 
     // Gegner und Hindernisse
     for (const m of mobs) if (trifftMob(m)) getroffen(m);
@@ -2456,13 +2586,19 @@ function starteCityJumper() {
     // Himmel und Boden wandern mit
     himmel.position.copy(camera.position);
     boden.position.set(Math.round(cx / KACHEL) * KACHEL, 0, Math.round(cz / KACHEL) * KACHEL);
-    const arr = nordlichtGeo.attributes.position.array;
-    for (let i = 0; i < arr.length; i += 3) {
-      const x = nordlichtBasis[i];
-      arr[i + 2] = nordlichtBasis[i + 2] + Math.sin(x * 0.02 + zeit * 0.6) * 25;
-      arr[i + 1] = nordlichtBasis[i + 1] + Math.sin(x * 0.035 + zeit * 0.9) * 6;
+    skyline.position.set(cx, 0, cz);
+    for (const n of nordlichter) {
+      const arr = n.geo.attributes.position.array;
+      for (let i = 0, k = 0; i < arr.length; i += 3, k++) {
+        const a = n.winkel[k];
+        const r = n.radius + Math.sin(a * 6 + zeit * 0.5 + n.phase) * 22;
+        arr[i] = Math.cos(a) * r;
+        arr[i + 2] = Math.sin(a) * r;
+        arr[i + 1] = n.basis[i + 1] + Math.sin(a * 9 + zeit * 0.8 + n.phase) * 7;
+      }
+      n.geo.attributes.position.needsUpdate = true;
+      n.mesh.rotation.y += dt * 0.01;
     }
-    nordlichtGeo.attributes.position.needsUpdate = true;
     // Schatten
     const b = state === "spiel" || state === "start" ? gebaeudeBei(p.z) : null;
     if (b && Math.abs(p.x) <= b.halb && p.y >= b.top - 0.01) {
