@@ -867,7 +867,7 @@ function starteCityJumper() {
   }
   const SCHILDER = [
     ["FROHE FESTE", "#ff3355"], ["HO HO HO", "#3dff8a"], ["HOTEL", "#9be7ff"], ["PIZZA", "#ffb347"],
-    ["KINO", "#ff5cf0"], ["ZUKUNFTSTAG", "#ffd34d"], ["NEON CITY", "#29f0ff"], ["GUETZLI", "#ff8a3d"]
+    ["KINO", "#ff5cf0"], ["ZUKUNFTSTAG", "#ffd34d"], ["NEON CITY", "#29f0ff"], ["GUETZLI", "#ff8a3d"], ["EL TONY MATE", "#c6ff3d"], ["EL TONY MATE", "#ffeb3b"]
   ].map(([t, f]) => new THREE.MeshBasicMaterial({ map: schildTextur(t, f), transparent: true, depthWrite: false }));
   const schildGeo = new THREE.PlaneGeometry(6.4, 1.6);
 
@@ -1651,12 +1651,8 @@ function starteCityJumper() {
     } else if (wohnung) {
       baueWohnung(b);
     } else {
-      // Portal in eine Wohnung? (das nächste Haus wird dann die Wohnung)
-      if (vorher && dist > E.wohnungAbMeter && dist - letzteWohnung > 450 && Math.random() < E.wohnungChance && laenge > 14) {
-        b.portal = true;
-        b.portalZ = z1 + 2.5;
-        const portal = bauePortal();
-        aufsDach(b, portal, 0, top + 2.8, b.portalZ);
+      // Kommt als nächstes ein Haus mit Loch im Dach (Wohnung)?
+      if (vorher && dist > E.wohnungAbMeter && dist - letzteWohnung > 450 && Math.random() < E.wohnungChance) {
         naechsteWohnung = true;
         letzteWohnung = dist;
       }
@@ -1755,8 +1751,59 @@ function starteCityJumper() {
     return { tp, tt, te };
   }
   let INNEN = null;
+  const lochTextur = (() => {
+    const [cv, c] = leinwand(256, 256);
+    for (let i = -256; i < 512; i += 32) { c.fillStyle = (i / 32) % 2 ? "#111" : "#ffd34d"; c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 16, 0); c.lineTo(i + 16 - 256, 256); c.lineTo(i - 256, 256); c.fill(); }
+    const g = c.createRadialGradient(128, 128, 10, 128, 128, 120);
+    g.addColorStop(0, "#000"); g.addColorStop(0.85, "#050510"); g.addColorStop(1, "#1a1030");
+    c.fillStyle = g; c.fillRect(22, 22, 212, 212);
+    return new THREE.CanvasTexture(cv);
+  })();
+  function textTextur(text, farbe) {
+    const [cv, c] = leinwand(512, 128);
+    c.fillStyle = "rgba(0,0,0,0.7)"; c.fillRect(0, 0, 512, 128);
+    c.font = "bold 80px 'Arial Black', Arial, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+    c.shadowColor = farbe; c.shadowBlur = 20; c.fillStyle = farbe; c.fillText(text, 256, 68);
+    return new THREE.CanvasTexture(cv);
+  }
+  // Schleichwerbung: El Tony Mate
+  function mateBild(w, h, flasche) {
+    const [cv, c] = leinwand(w, h);
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#2e7d32"); g.addColorStop(1, "#123d16");
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.strokeStyle = "#c6ff3d"; c.lineWidth = 8; c.strokeRect(6, 6, w - 12, h - 12);
+    if (flasche) {
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+        const x = 30 + j * (w - 60) / 4, y = 40 + i * (h - 60) / 3;
+        c.fillStyle = "#c6ff3d"; c.fillRect(x + 10, y, 14, 18); c.fillRect(x, y + 18, 34, (h - 60) / 3 - 30);
+        c.fillStyle = "#123d16"; c.font = "bold 12px Arial"; c.fillText("MATE", x + 2, y + 50);
+      }
+    } else {
+      c.textAlign = "center"; c.textBaseline = "middle";
+      c.shadowColor = "#c6ff3d"; c.shadowBlur = 18; c.fillStyle = "#ffeb3b";
+      c.font = `bold ${Math.round(h * 0.32)}px 'Arial Black', Arial, sans-serif`; c.fillText("EL TONY", w / 2, h * 0.36);
+      c.fillStyle = "#c6ff3d"; c.font = `bold ${Math.round(h * 0.26)}px 'Arial Black', Arial, sans-serif`; c.fillText("MATE", w / 2, h * 0.7);
+    }
+    return new THREE.CanvasTexture(cv);
+  }
+  const mateTextur = mateBild(512, 256, false);
+  const mateKuehlTextur = mateBild(256, 512, true);
+  // Zeppelin mit Werbung, kreist hoch über der Stadt (El Tony Mate)
+  const zeppelin = new THREE.Group();
+  {
+    const huelle = new THREE.Mesh(new THREE.SphereGeometry(6, 24, 16), new THREE.MeshStandardMaterial({ color: 0xdfe6ee, metalness: 0.4, roughness: 0.4, fog: false }));
+    huelle.scale.set(3, 1, 1); zeppelin.add(huelle);
+    const gondel = new THREE.Mesh(new THREE.BoxGeometry(5, 1.6, 2), new THREE.MeshStandardMaterial({ color: 0x1b5e20, fog: false })); gondel.position.y = -6.4; zeppelin.add(gondel);
+    for (const s of [-1, 1]) {
+      const band = new THREE.Mesh(new THREE.PlaneGeometry(22, 7), new THREE.MeshBasicMaterial({ map: mateTextur, fog: false, side: THREE.DoubleSide }));
+      band.position.z = s * 6.05; zeppelin.add(band);
+    }
+    for (const [y, z] of [[5, 0], [0, 5], [0, -5]]) { const f = new THREE.Mesh(new THREE.BoxGeometry(4, y ? 5 : 0.4, z ? 0.4 : 0.4), new THREE.MeshStandardMaterial({ color: 0x2e7d32, fog: false })); f.position.set(-17, y * 0.8, z * 0.8); if (z) f.scale.set(1, 1, 1), f.rotation.x = Math.PI / 2; zeppelin.add(f); }
+    const lampe = new THREE.Sprite(glowMat(0xc6ff3d, { fog: false })); lampe.scale.set(30, 14, 1); zeppelin.add(lampe);
+    himmel.add(zeppelin);
+  }
   const moebelFarben = [0xc8102e, 0x2f5bd3, 0x1f9d4a, 0x7a4c9e, 0xd98a2b];
-  function neuesMoebel(b, typ, x, z) {
+  function neuesMoebel(b, typ, x, z, y = b.boden) {
     const g = new THREE.Group();
     let hx = 1.2, hz = 0.5, h = 0.95, unten = 0;
     if (typ === "sofa") {
@@ -1783,10 +1830,10 @@ function starteCityJumper() {
       const birne = new THREE.Sprite(glowMat(0xffe6a0)); birne.scale.set(2.2, 2.2, 1); birne.position.y = 1.3; g.add(birne);
       const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false })); pf.scale.set(0.8, 0.8, 1); pf.position.set(0, 0.5, 0.3); g.add(pf);
     }
-    wpos(b.seg, x, b.boden, z, g.position);
+    wpos(b.seg, x, y, z, g.position);
     g.rotation.y = b.seg.winkel;
     scene.add(g);
-    mobs.push({ typ, g, b, z, form: "box", tx: x, ty: b.boden, hx, hz, h, unten, statisch: true, weg: false });
+    mobs.push({ typ, g, b, z, form: "box", tx: x, ty: y, hx, hz, h, unten, statisch: true, weg: false });
   }
   function baueWohnung(b) {
     if (!INNEN) INNEN = innenTexturen();
@@ -1804,12 +1851,44 @@ function starteCityJumper() {
     const deckeMat = new THREE.MeshLambertMaterial({ color: 0xfff4e0, emissive: 0x403020, side: THREE.DoubleSide });
     b.mats.push(bodenMat, wandMat, deckeMat);
     const boden_ = new THREE.Mesh(new THREE.PlaneGeometry(w, L), bodenMat); boden_.rotation.x = -Math.PI / 2; g.add(boden_);
-    const decke = new THREE.Mesh(new THREE.PlaneGeometry(w, L), deckeMat); decke.rotation.x = Math.PI / 2; decke.position.y = H; g.add(decke);
+    // Decke: vorne offen, dort ist das Loch, durch das man reinfällt
+    const LOCH = 12;
+    const decke = new THREE.Mesh(new THREE.PlaneGeometry(w, L - LOCH), deckeMat); decke.rotation.x = Math.PI / 2; decke.position.set(0, H, -LOCH / 2); g.add(decke);
+    // Loch im Dach (oben aufs Dach gemalt) mit Warnstreifen
+    const lochMesh = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, 8), new THREE.MeshBasicMaterial({ map: lochTextur }));
+    lochMesh.rotation.x = -Math.PI / 2; lochMesh.position.set(0, 6.04, L / 2 - 7.5); g.add(lochMesh);
+    const lochGlanz = new THREE.Sprite(glowMat(0xff3355, { opacity: 0.6 })); lochGlanz.scale.set(10, 5, 1); lochGlanz.position.set(0, 6.5, L / 2 - 7.5); g.add(lochGlanz);
+    for (const sx of [-2.5, 0, 2.5]) { const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false })); pf.scale.set(1.2, 1.2, 1); pf.position.set(sx, 7.6, L / 2 - 4); g.add(pf); }
     for (const s of [-1, 1]) { const wand = new THREE.Mesh(new THREE.PlaneGeometry(L, H), wandMat); wand.rotation.y = -s * Math.PI / 2; wand.position.set(s * w / 2, H / 2, 0); g.add(wand); }
     const hinten = new THREE.Mesh(new THREE.PlaneGeometry(w, H), new THREE.MeshLambertMaterial({ color: 0xd6c29a, emissive: 0x302010, side: THREE.DoubleSide }));
     hinten.position.z = -L / 2; hinten.position.y = H / 2; g.add(hinten);
-    // Ausgangs-Portal hinten an der Wand
-    const aus = bauePortal(); aus.scale.setScalar(0.8); aus.position.set(0, 2.1, -L / 2 + 0.3); g.add(aus);
+    // Aufzug am Ende: Wand mit Türöffnung, Kabine dahinter, Türen schliessen sich
+    const AZ = -L / 2 + 2.6;
+    const metall = std(0xb9c0cc, { metalness: 0.8, roughness: 0.3 });
+    const wandL = box(w / 2 - 1.4, H, 0.2, std(0xd6c29a)); wandL.position.set(-(w / 4 + 0.7), H / 2, AZ); g.add(wandL);
+    const wandR = wandL.clone(); wandR.position.x = w / 4 + 0.7; g.add(wandR);
+    const sturz = box(2.8, H - 3.2, 0.2, std(0xd6c29a)); sturz.position.set(0, 3.2 + (H - 3.2) / 2, AZ); g.add(sturz);
+    for (const sx of [-1.45, 1.45]) { const rahmen = box(0.15, 3.3, 0.3, metall); rahmen.position.set(sx, 1.65, AZ); g.add(rahmen); }
+    const kabine = box(2.8, 0.05, 2.4, metall); kabine.position.set(0, 0.03, AZ - 1.2); g.add(kabine);
+    const kabinenLicht = new THREE.Sprite(glowMat(0xdff8ff)); kabinenLicht.scale.set(3, 3, 1); kabinenLicht.position.set(0, 3, AZ - 1.2); g.add(kabinenLicht);
+    const pfeilHoch = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("🔼"), transparent: true, depthWrite: false })); pfeilHoch.scale.set(0.9, 0.9, 1); pfeilHoch.position.set(0, 3.75, AZ + 0.2); g.add(pfeilHoch);
+    const aufzugSchild = new THREE.Sprite(new THREE.SpriteMaterial({ map: textTextur("AUFZUG", "#29f0ff"), transparent: true, depthWrite: false })); aufzugSchild.scale.set(2.4, 0.6, 1); aufzugSchild.position.set(0, 4.2, AZ + 0.2); g.add(aufzugSchild);
+    b.tueren = [];
+    for (const sx of [-1, 1]) { const t = box(1.4, 3.2, 0.08, metall); t.position.set(sx * 2.1, 1.6, AZ + 0.12); g.add(t); b.tueren.push(t); }
+    b.aufzugZ = b.z1 + 2.6;
+    // El Tony Mate: Plakate an der Wand und ein Kühlschrank
+    for (let z = L / 2 - 20; z > -L / 2 + 10; z -= 35) {
+      const plakat = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: mateTextur, side: THREE.DoubleSide }));
+      const sx = Math.random() < 0.5 ? -1 : 1;
+      plakat.rotation.y = -sx * Math.PI / 2; plakat.position.set(sx * (w / 2 - 0.05), 2.4, z); g.add(plakat);
+    }
+    const kuehl = new THREE.Group();
+    const k1 = box(1.1, 2.2, 0.8, std(0x1b5e20)); k1.position.y = 1.1; kuehl.add(k1);
+    const k2 = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.9), new THREE.MeshBasicMaterial({ map: mateKuehlTextur })); k2.position.set(0, 1.15, 0.41); kuehl.add(k2);
+    const kg = new THREE.Sprite(glowMat(0xc6ff3d, { opacity: 0.5 })); kg.scale.set(3, 3.5, 1); kg.position.set(0, 1.2, 0.5); kuehl.add(kg);
+    kuehl.position.set((Math.random() < 0.5 ? -1 : 1) * (w / 2 - 0.6), 0, L / 2 - 45);
+    kuehl.rotation.y = kuehl.position.x < 0 ? Math.PI / 2 : -Math.PI / 2;
+    g.add(kuehl);
     // Deckenlichter, Teppiche, Bilder, Christbäume
     for (let z = L / 2 - 5; z > -L / 2 + 4; z -= 9) {
       const l = new THREE.Sprite(glowMat(0xffe6a0)); l.scale.set(3, 3, 1); l.position.set(0, H - 0.2, z); g.add(l);
@@ -1823,7 +1902,7 @@ function starteCityJumper() {
     b.deko.push(g);
     // Möbel als Hindernisse und Geschenke
     const spuren = [-2, 0, 2];
-    for (let z = b.z0 - 14; z > b.z1 + 10; z -= rand(10, 14)) {
+    for (let z = b.z0 - 30; z > b.z1 + 10; z -= rand(10, 14)) {
       const typ = waehle(["sofa", "tisch", "lampe", "lampe", "geschenkberg"]);
       const frei = waehle(spuren);
       const belegt = spuren.filter(x => x !== frei);
@@ -1934,7 +2013,8 @@ function starteCityJumper() {
   // Hindernisse stehen still. Kiste und Laser: drüberspringen. Kamin und Schneemann: ausweichen.
   function neuesHindernis(b, z, dist) {
     // Laser und Kamine waren zu nervig, darum nur noch Kisten und Schneemänner
-    const typ = waehle(dist < 200 ? ["kiste", "banner"] : ["kiste", "schneemann", "banner", "banner"]);
+    const typ = waehle(dist < 200 ? ["geschenkberg", "banner"] : ["geschenkberg", "schneemann", "banner", "banner"]);
+    if (typ === "geschenkberg") { neuesMoebel(b, typ, waehle([-2, 0, 2]), z, b.top); return; }
     let unten = 0;
     const g = new THREE.Group();
     let x = waehle([-2, 0, 2]), hx = 0.7, hz = 0.6, h = 0.8;
@@ -2157,7 +2237,7 @@ function starteCityJumper() {
     bisEcke = Math.floor(rand(E.eckeAlle[0], E.eckeAlle[1] + 1));
     naechsteRichtung = Math.random() < 0.5 ? -1 : 1;
     letzteRichtung = 0; gleichZaehler = 0; ohneSeite = 0;
-    naechsteWohnung = false; letzteWohnung = -999; drinnen = null;
+    naechsteWohnung = false; letzteWohnung = -999; drinnen = null; aufzug = null;
     while (naechsteFront > -230) neuesGebaeude();
   }
   function spielerZuruecksetzen() {
@@ -2396,32 +2476,60 @@ function starteCityJumper() {
     wpos(pSeg, p.x * 0.6, p.y + (drinnen ? 2.4 : 3.4), p.z + (drinnen ? 5.5 : 7.5), camera.position);
     wpos(pSeg, p.x * 0.4, p.y + 1.2, p.z - 8, blickJetzt);
   }
+  // Rein: das Dach verschwindet unter dir und du fällst durchs Loch in die Wohnung
   function betreteWohnung(W) {
     drinnen = W;
+    W.betreten = true;
     W.dachTop = W.top;
     W.top = W.boden;
-    W.mesh.visible = false;
+    W.gelandet = false;
     if (power && power.typ.id === "rentierflug") power = null;
     if (schirmAn) schirmZu();
-    Object.assign(p, { x: 0, y: W.boden, z: W.z0 - 1.5, vx: 0, vy: 0 });
-    amBoden = true; anWand = false; geschleudert = 0; sturzStart = null; fallschirmPrompt = false;
+    amBoden = false; anWand = false; geschleudert = 0; sturzStart = null; fallschirmPrompt = false;
+    p.vy = Math.min(p.vy, 0);
+    zeigeRuf("🕳️ AB INS LOCH!");
+    explosion(pw.x, pw.y + 0.5, pw.z, 0xffd34d, 30, 5, 4, 0.6);
+  }
+  // Raus: im Aufzug nach oben
+  let aufzug = null;
+  function starteAufzug() {
+    aufzug = { t: 0, W: drinnen };
+    Object.assign(p, { z: drinnen.z1 + 1.3, vy: 0 });
+    amBoden = true; rutschen = 0;
+    zeigeRuf("🛗 AUFZUG!");
+    ding();
+  }
+  function aufzugUpdate(dt) {
+    aufzug.t += dt;
+    const W = aufzug.W;
+    p.x += (0 - p.x) * Math.min(1, dt * 10);
+    const zu = clamp(aufzug.t / 0.5, 0, 1);
+    W.tueren.forEach((t, i) => { t.position.x = (i ? 1 : -1) * (2.1 - zu * 1.4); });
     wpos(pSeg, p.x, p.y, p.z, pw);
-    kameraSprung();
-    blitz();
-    zeigeRuf("🏠 AB IN DIE WOHNUNG!");
+    spieler.position.copy(pw);
+    animiereFigur(figur, 0, false, false);
+    figur.gruppe.rotation.x = 0; figur.gruppe.position.y = 0;
+    if (aufzug.t > 1.0) { aufzug = null; verlasseWohnung(); ding(); }
+  }
+  function ding() {
+    if (!musik.ctx || !stand.musik) return;
+    const t = musik.ctx.currentTime;
+    ton(1318.5, t, 0.5);
+    ton(1046.5, t + 0.25, 0.8);
   }
   function verlasseWohnung() {
     const W = drinnen;
     drinnen = null;
     W.top = W.dachTop;
     W.mesh.visible = true;
+    W.tueren.forEach((t, i) => { t.position.x = (i ? 1 : -1) * 2.1; });
     const n = gebaeude.find(b => b.segs.includes(pSeg) && b.z0 < W.z1);
     if (n) Object.assign(p, { x: 0, y: n.top, z: n.z0 - 1.5, vx: 0, vy: 0 });
     amBoden = true; unverwundbar = 1;
     wpos(pSeg, p.x, p.y, p.z, pw);
     kameraSprung();
     blitz();
-    zeigeRuf("☀️ ZURÜCK AUFS DACH!");
+    zeigeRuf("🛗 DING! ZURÜCK AUFS DACH!");
     explosion(pw.x, pw.y + 1, pw.z, 0xb25cff, 60, 9, 2, 0.8);
   }
   function herzSammeln() {
@@ -2653,6 +2761,7 @@ function starteCityJumper() {
 
   // ===== Das Spiel Schritt für Schritt =====
   function spielUpdate(dt) {
+    if (aufzug) { aufzugUpdate(dt); hud(); return; }
     tempo = Math.min(E.maxTempo, tempo + E.beschleunigung * dt);
     coyote -= dt; sprungPuffer -= dt; rutschen -= dt; rutschPuffer -= dt; unverwundbar -= dt; geschleudert -= dt;
     if (drehPuffer) { drehPuffer.t -= dt; if (drehPuffer.t <= 0) drehPuffer = null; else drehen(drehPuffer.r); }
@@ -2819,17 +2928,16 @@ function starteCityJumper() {
       }
     }
 
-    // Portale: rein in die Wohnung und wieder raus
+    // Wohnung: durchs Loch rein, mit dem Aufzug raus
     if (!drinnen) {
-      const P = gebaeude.find(g => g.portal && !g.portalBenutzt && g.segs.includes(pSeg));
-      if (P && p.z <= P.portalZ && p.z > P.portalZ - 4 && p.y > P.top - 1) {
-        P.portalBenutzt = true;
-        const W = gebaeude[gebaeude.indexOf(P) + 1];
-        if (W && W.wohnung) betreteWohnung(W);
-      }
+      const W = gebaeude.find(g => g.wohnung && !g.betreten && g.segs.includes(pSeg));
+      if (W && p.z <= W.z0 - 4 && p.z > W.z1 + 10 && p.y > W.boden + 3) betreteWohnung(W);
     } else {
-      if (p.y > drinnen.boden + 4.5 - 1.9) { p.y = drinnen.boden + 4.5 - 1.9; p.vy = Math.min(p.vy, 0); } // Decke
-      if (p.z <= drinnen.z1 + 1.5) verlasseWohnung();
+      if (amBoden) drinnen.gelandet = true;
+      // Haus von aussen ausblenden, sobald die Kamera unter dem Dach ist
+      if (drinnen.mesh.visible && camera.position.y < drinnen.dachTop - 0.3) drinnen.mesh.visible = false;
+      if (drinnen.gelandet && p.y > drinnen.boden + 4.5 - 1.9) { p.y = drinnen.boden + 4.5 - 1.9; p.vy = Math.min(p.vy, 0); } // Decke
+      if (p.z <= drinnen.aufzugZ && !aufzug) starteAufzug();
     }
     // Neue Häuser vorne, alte hinten weg
     while (naechsteFront > p.z - 230) neuesGebaeude();
@@ -2907,6 +3015,8 @@ function starteCityJumper() {
     }
     // Himmel und Boden wandern mit
     himmel.position.copy(camera.position);
+    zeppelin.position.set(Math.cos(zeit * 0.03) * 170, 70 + Math.sin(zeit * 0.4) * 3, Math.sin(zeit * 0.03) * 170);
+    zeppelin.rotation.y = -zeit * 0.03 - Math.PI / 2;
     boden.position.set(Math.round(cx / KACHEL) * KACHEL, 0, Math.round(cz / KACHEL) * KACHEL);
     skyline.position.set(cx, 0, cz);
     for (const n of nordlichter) {
