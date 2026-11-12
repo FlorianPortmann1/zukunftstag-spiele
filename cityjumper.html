@@ -241,6 +241,21 @@ kbd {
 .steuerwahl button[aria-pressed="true"] { background: var(--eis); color: var(--nacht); }
 body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-knoepfe { display: none; }
 
+.musik-btn {
+  position: absolute;
+  z-index: 6;
+  top: calc(max(10px, env(safe-area-inset-top, 0px)) + 54px);
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(155, 231, 255, 0.5);
+  background: rgba(11, 16, 48, 0.6);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.musik-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
 /* Handy-Knöpfe: links/rechts unten links, Springen unten rechts */
 .pad-knopf {
   position: absolute;
@@ -420,6 +435,8 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
   <div id="dreh" class="ruf" hidden><span id="dreh-text">⬅ LINKS!</span><small><span class="nur-pc">PFEILTASTE DRÜCKEN</span><span class="nur-handy">IN DIE RICHTUNG LENKEN</span></small></div>
   <div id="hoho" class="ruf" hidden>HO HO HO!</div>
   <div id="powerruf" class="ruf" hidden></div>
+
+  <button id="musik-btn" class="musik-btn" type="button" aria-label="Musik an oder aus">🔊</button>
 
   <div id="pad" hidden>
     <button id="k-links" class="pad-knopf links" type="button" aria-label="Links">◀</button>
@@ -2784,6 +2801,116 @@ function starteCityJumper() {
     if (k === "ArrowRight" || k === "d" || k === "D") tasten.rechts = false;
   });
   window.addEventListener("blur", () => { tasten.links = tasten.rechts = false; });
+
+  // ===== Weihnachtsmusik (selbst gespielt mit dem Web-Audio-Synthesizer) =====
+  // Noten: Name + Oktave, dann Länge in Schlägen. "-" ist eine Pause.
+  const LIEDER = [
+    { name: "Jingle Bells", bpm: 210, noten: "E5 1 E5 1 E5 2 E5 1 E5 1 E5 2 E5 1 G5 1 C5 1.5 D5 0.5 E5 4 F5 1 F5 1 F5 1.5 F5 0.5 F5 1 E5 1 E5 1 E5 0.5 E5 0.5 E5 1 D5 1 D5 1 E5 1 D5 2 G5 2 E5 1 E5 1 E5 2 E5 1 E5 1 E5 2 E5 1 G5 1 C5 1.5 D5 0.5 E5 4 F5 1 F5 1 F5 1.5 F5 0.5 F5 1 E5 1 E5 1 E5 0.5 E5 0.5 G5 1 G5 1 F5 1 D5 1 C5 4" },
+    { name: "We Wish You a Merry Christmas", bpm: 190, noten: "G4 1 C5 1 C5 0.5 D5 0.5 C5 0.5 B4 0.5 A4 1 A4 1 A4 1 D5 1 D5 0.5 E5 0.5 D5 0.5 C5 0.5 B4 1 G4 1 G4 1 E5 1 E5 0.5 F5 0.5 E5 0.5 D5 0.5 C5 1 A4 1 G4 0.5 G4 0.5 A4 1 D5 1 B4 1 C5 3" },
+    { name: "O Tannenbaum", bpm: 130, noten: "G4 1 C5 0.75 C5 0.25 C5 1.5 D5 0.5 E5 0.75 E5 0.25 E5 1.5 E5 0.5 D5 0.5 E5 0.5 F5 1 B4 1 D5 1 C5 2 G5 0.5 G5 0.5 E5 0.5 A5 1.5 G5 0.5 G5 0.5 F5 0.5 F5 1.5 F5 0.5 F5 0.5 D5 0.5 G5 1.5 F5 0.5 F5 0.5 E5 0.5 E5 1 G4 1 C5 0.75 C5 0.25 C5 1.5 D5 0.5 E5 0.75 E5 0.25 E5 1.5 E5 0.5 D5 0.5 E5 0.5 F5 1 B4 1 D5 1 C5 2" }
+  ].map(l => {
+    const t = l.noten.split(" ");
+    const liste = [];
+    for (let i = 0; i < t.length; i += 2) liste.push([t[i], Number(t[i + 1])]);
+    return { ...l, liste };
+  });
+  const HALBTON = { C: 0, "C#": 1, D: 2, "D#": 3, E: 4, F: 5, "F#": 6, G: 7, "G#": 8, A: 9, "A#": 10, B: 11 };
+  function frequenz(n) {
+    const m = n.match(/^([A-G]#?)(\d)$/);
+    return 440 * Math.pow(2, (12 * (Number(m[2]) + 1) + HALBTON[m[1]] - 69) / 12);
+  }
+  const musik = { ctx: null, master: null, rauschen: null, timer: null, lied: 0, idx: 0, naechste: 0, schlag: 0 };
+  if (stand.musik === undefined) stand.musik = true;
+  function ton(f, t, d) {
+    const c = musik.ctx;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.22, t + Math.min(0.25, d * 0.6));
+    g.gain.linearRampToValueAtTime(0, t + d * 0.95);
+    g.connect(musik.master);
+    for (const [typ, faktor, laut] of [["triangle", 1, 1], ["square", 1, 0.18], ["sine", 0.5, 0.5]]) {
+      const o = c.createOscillator();
+      o.type = typ;
+      o.frequency.value = f * faktor;
+      const og = c.createGain();
+      og.gain.value = laut;
+      o.connect(og).connect(g);
+      o.start(t);
+      o.stop(t + d);
+    }
+  }
+  function glocke(t, laut) {
+    const c = musik.ctx;
+    const q = c.createBufferSource();
+    q.buffer = musik.rauschen;
+    const filter = c.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 7000;
+    const g = c.createGain();
+    g.gain.setValueAtTime(laut, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    q.connect(filter).connect(g).connect(musik.master);
+    q.start(t);
+    q.stop(t + 0.15);
+  }
+  function musikPlanen() {
+    const c = musik.ctx;
+    if (musik.naechste < c.currentTime) musik.naechste = c.currentTime + 0.05; // nach einer Pause nicht nachholen
+    while (musik.naechste < c.currentTime + 0.4) {
+      const lied = LIEDER[musik.lied];
+      const [note, schlaege] = lied.liste[musik.idx];
+      const sek = schlaege * 60 / lied.bpm;
+      if (note !== "-") ton(frequenz(note), musik.naechste, sek);
+      // Schlittenglöckchen auf jedem Schlag
+      const ende = musik.schlag + schlaege;
+      for (let s = Math.ceil(musik.schlag - 1e-6); s < ende - 1e-6; s++) glocke(musik.naechste + (s - musik.schlag) * 60 / lied.bpm, s % 2 ? 0.25 : 0.45);
+      musik.schlag = ende;
+      musik.naechste += sek;
+      musik.idx++;
+      if (musik.idx >= lied.liste.length) {
+        musik.idx = 0; musik.schlag = 0;
+        musik.lied = (musik.lied + 1) % LIEDER.length;
+        musik.naechste += 1.2; // kurze Pause zwischen den Liedern
+      }
+    }
+  }
+  function musikStart() {
+    if (!stand.musik) return;
+    if (!musik.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      musik.ctx = new AC();
+      musik.master = musik.ctx.createGain();
+      musik.master.gain.value = 0.09;
+      musik.master.connect(musik.ctx.destination);
+      const n = musik.ctx.sampleRate * 0.2;
+      musik.rauschen = musik.ctx.createBuffer(1, n, musik.ctx.sampleRate);
+      const daten = musik.rauschen.getChannelData(0);
+      for (let i = 0; i < n; i++) daten[i] = Math.random() * 2 - 1;
+    }
+    musik.ctx.resume();
+    if (!musik.timer) musik.timer = setInterval(musikPlanen, 100);
+  }
+  function musikStop() {
+    clearInterval(musik.timer);
+    musik.timer = null;
+    if (musik.ctx) musik.ctx.suspend();
+  }
+  function zeigeMusik() { $("musik-btn").textContent = stand.musik ? "🔊" : "🔇"; }
+  $("musik-btn").addEventListener("click", e => {
+    stand.musik = !stand.musik;
+    speichern();
+    zeigeMusik();
+    if (stand.musik) musikStart(); else musikStop();
+    e.currentTarget.blur();
+  });
+  zeigeMusik();
+  // Browser erlauben Ton erst nach dem ersten Tippen oder Tastendruck
+  const ersteBeruehrung = () => { musikStart(); window.removeEventListener("pointerdown", ersteBeruehrung); window.removeEventListener("keydown", ersteBeruehrung); };
+  window.addEventListener("pointerdown", ersteBeruehrung);
+  window.addEventListener("keydown", ersteBeruehrung);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (musik.ctx) musik.ctx.suspend(); } else if (stand.musik && musik.timer) musik.ctx.resume(); });
 
   // Handy-Steuerung wählen: Knöpfe oder Wischen
   const mitKnoepfen = () => handy && stand.steuerung === "knoepfe";

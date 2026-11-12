@@ -187,6 +187,8 @@ const EINSTELLUNGEN = {
   blockDichte: 0.06,     // Blöcke pro Meter
   kristallDichte: 0.035, // Kristalle pro Meter
   mauerAbstand: 160,     // alle so viele Meter kommt eine Mauer mit Loch
+  lochBreite: 8,         // so breit ist das Loch in der Mauer (vorher 5)
+  lochHoehe: 6,          // so hoch ist das Loch in der Mauer (vorher 3.6)
   rollDauer: 0.6,        // Sekunden, die eine Fassrolle dauert
   rollPause: 1.5         // Sekunden bis zur nächsten Fassrolle
 };
@@ -379,8 +381,9 @@ function starteNeonflug() {
     }
   }
   function spawnMauer(z) {
-    const gx = rand(-BREITE + 3, BREITE - 3), gy = rand(2.5, HOEHE_MAX - 1.5);
-    const gw = 5, gh = 3.6;
+    const gw = EINSTELLUNGEN.lochBreite, gh = EINSTELLUNGEN.lochHoehe;
+    const gx = rand(-BREITE + gw / 2, BREITE - gw / 2);
+    const gy = rand(Math.max(2.5, gh / 2 + 0.3), Math.max(2.5, gh / 2 + 0.3, HOEHE_MAX - 1));
     const L = -BREITE - 4, R = BREITE + 4, T = HOEHE_MAX + 4;
     addBox((L + gx - gw / 2) / 2, T / 2, gx - gw / 2 - L, T, 1, z, pinkLine);
     addBox((gx + gw / 2 + R) / 2, T / 2, R - (gx + gw / 2), T, 1, z, pinkLine);
