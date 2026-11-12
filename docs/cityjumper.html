@@ -289,6 +289,11 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
 }
 .pad-knopf.links { left: max(16px, env(safe-area-inset-left, 0px)); }
 .pad-knopf.rechts { left: calc(max(16px, env(safe-area-inset-left, 0px)) + 92px); }
+.pad-knopf.rutsch {
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 108px);
+  border-color: var(--gold);
+  background: rgba(255, 211, 77, 0.2);
+}
 .pad-knopf.sprung {
   right: max(16px, env(safe-area-inset-right, 0px));
   width: 96px;
@@ -473,6 +478,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
     <button id="k-links" class="pad-knopf links" type="button" aria-label="Links">◀</button>
     <button id="k-rechts" class="pad-knopf rechts" type="button" aria-label="Rechts">▶</button>
     <button id="k-sprung" class="pad-knopf sprung" type="button" aria-label="Springen">⬆</button>
+    <button id="k-rutsch" class="pad-knopf rutsch" type="button" aria-label="Rutschen">⬇</button>
   </div>
 
   <a id="home" class="home" href="index.html" aria-label="Zurück zur Spielauswahl" title="Zurück zur Spielauswahl" hidden>🏠</a>
@@ -483,8 +489,8 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
       <div class="untertitel">❄️ Weihnachts-Edition ❄️</div>
       <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und bösen Schneemännern aus. Bei den Pfeilen musst du abbiegen!</p>
       <p>Du hast 3 ❤️. Wenn du abstürzt: schnell drücken, dann rettet dich der Fallschirm (kostet ein Herz). Seltene ❤️ auf den Dächern füllen auf.</p>
-      <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen.</p>
-      <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen.</span></p>
+      <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen, <kbd>↓</kbd> = rutschen.</p>
+      <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen, ⬇ = rutschen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen. Nach unten wischen = rutschen.</span></p>
       <div class="steuerwahl"><span>Steuerung:</span><button type="button" data-steuer="knoepfe">🎮 Knöpfe</button><button type="button" data-steuer="wischen">👆 Wischen</button></div>
       <div class="knoepfe">
         <button id="start-btn" class="go" type="button">Los geht's!</button>
@@ -536,6 +542,7 @@ const EINSTELLUNGEN = {
   maxTempo: 28,           // schneller wird es nicht
   beschleunigung: 0.2,    // so viel schneller pro Sekunde
   sprungKraft: 10.5,      // wie hoch man springt
+  rutschDauer: 0.8,       // Sekunden, die man rutscht
   schwerkraft: 26,        // wie stark es nach unten zieht
   seitenTempo: 9,         // wie schnell man nach links und rechts läuft
   zeitlupe: 0.35,         // so langsam läuft die Zeit, wenn der Fallschirm-Knopf erscheint
@@ -1777,7 +1784,8 @@ function starteCityJumper() {
   // Hindernisse stehen still. Kiste und Laser: drüberspringen. Kamin und Schneemann: ausweichen.
   function neuesHindernis(b, z, dist) {
     // Laser und Kamine waren zu nervig, darum nur noch Kisten und Schneemänner
-    const typ = waehle(dist < 200 ? ["kiste"] : ["kiste", "kiste", "schneemann"]);
+    const typ = waehle(dist < 200 ? ["kiste", "banner"] : ["kiste", "schneemann", "banner", "banner"]);
+    let unten = 0;
     const g = new THREE.Group();
     let x = waehle([-2, 0, 2]), hx = 0.7, hz = 0.6, h = 0.8;
     if (typ === "kiste") {
@@ -1796,6 +1804,18 @@ function starteCityJumper() {
       const strahl = box(b.halb * 2 - 0.4, 0.08, 0.08, laserMat); strahl.position.y = 0.6; g.add(strahl);
       const strahl2 = box(b.halb * 2 - 0.4, 0.08, 0.08, laserMat); strahl2.position.y = 0.3; g.add(strahl2);
       const gl = new THREE.Sprite(glowMat(0xff2233, { opacity: 0.5 })); gl.scale.set(b.halb * 2, 1.2, 1); gl.position.y = 0.45; g.add(gl);
+    } else if (typ === "banner") {
+      // Weihnachts-Banner über das ganze Dach: drunter durchrutschen!
+      x = 0;
+      hx = b.halb; hz = 0.3; unten = 1.05; h = 3.6;
+      for (const s of [-1, 1]) { const p = box(0.22, 3.6, 0.22, pfostenMat); p.position.set(s * (b.halb - 0.15), 1.8, 0); g.add(p); }
+      const balken = box(b.halb * 2, 2.5, 0.2, std(0x7a0f1c)); balken.position.y = 2.33; g.add(balken);
+      const schild = new THREE.Mesh(schildGeo, waehle(SCHILDER));
+      schild.scale.set(Math.min(1, (b.halb * 2 - 0.6) / 6.4), 1.2, 1);
+      schild.position.set(0, 2.2, 0.12); g.add(schild);
+      for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(kugelGeo, waehle(kugelMats)); l.scale.setScalar(1.6); l.position.set(-b.halb + 0.4 + i * (b.halb * 2 - 0.8) / 9, 1.08, 0.12); g.add(l); }
+      const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false }));
+      pf.scale.set(1, 1, 1); pf.position.set(0, 0.55, 0.3); g.add(pf);
     } else {
       const u = kugel(0.55, weissMat); u.position.y = 0.5; g.add(u);
       const o = kugel(0.38, weissMat); o.position.y = 1.2; g.add(o);
@@ -1807,7 +1827,7 @@ function starteCityJumper() {
     wpos(b.seg, x, b.top, z, g.position);
     g.rotation.y = b.seg.winkel;
     scene.add(g);
-    mobs.push({ typ, g, b, z, form: "box", tx: x, ty: b.top, hx, hz, h, statisch: true, weg: false });
+    mobs.push({ typ, g, b, z, form: "box", tx: x, ty: b.top, hx, hz, h, unten, statisch: true, weg: false });
   }
   function mobTrack(m, t) {
     const b = m.b, w = b.halb - 0.8;
@@ -1840,13 +1860,15 @@ function starteCityJumper() {
     if (m.weg || !m.b.segs.includes(pSeg)) return false;
     if (Math.abs(m.z - p.z) > 2.5) return false;
     if (m.form === "box") {
-      return Math.abs(p.x - m.tx) < m.hx + 0.3 && Math.abs(p.z - m.z) < m.hz + 0.3 && p.y < m.ty + m.h - 0.05 && p.y + 1.8 > m.ty;
+      const groesse = rutschen > 0 && amBoden ? 0.9 : 1.8;
+      return Math.abs(p.x - m.tx) < m.hx + 0.3 && Math.abs(p.z - m.z) < m.hz + 0.3 && p.y < m.ty + m.h - 0.05 && p.y + groesse > m.ty + (m.unten || 0);
     }
     const my = m.ty + (m.typ === "roboter" ? 0.75 : 0);
     const r = m.radius + 0.35;
     const dx = m.tx - p.x, dz = m.z - p.z;
     const d1 = dx * dx + dz * dz + (my - p.y - 0.5) ** 2;
     const d2 = dx * dx + dz * dz + (my - p.y - 1.4) ** 2;
+    if (rutschen > 0 && amBoden) return dx * dx + dz * dz + (my - p.y - 0.4) ** 2 < r * r;
     return Math.min(d1, d2) < r * r;
   }
 
@@ -1951,6 +1973,7 @@ function starteCityJumper() {
   // ===== Spielzustand =====
   let state = "start";
   let pausiert = false;
+  let rutschen = 0, rutschPuffer = 0; // Rutschen: Zeit, die man noch am Boden rutscht
   let zeit = 0, zeitFaktor = 1;
   let tempo = E.startTempo;
   const p = { x: 0, y: 22, z: 0, vx: 0, vy: 0 };
@@ -1991,7 +2014,8 @@ function starteCityJumper() {
     spielerWinkel = 0;
     pSeg = segmente[0];
     Object.assign(p, { x: 0, y: gebaeude[0].top, z: 0, vx: 0, vy: 0 });
-    amBoden = true; coyote = 0; sprungPuffer = 0; doppelBenutzt = false; drehPuffer = null;
+    amBoden = true; coyote = 0; sprungPuffer = 0; doppelBenutzt = false; drehPuffer = null; rutschen = 0; rutschPuffer = 0;
+    figur.gruppe.rotation.x = 0; figur.gruppe.position.y = 0;
     anWand = false; geschleudert = 0; unverwundbar = 0;
     maxLeben = hat("fallschirm2") ? 4 : 3;
     leben = maxLeben;
@@ -2046,11 +2070,22 @@ function starteCityJumper() {
     if (fallschirmPrompt) { oeffneSchirm(); return; }
     if (!springen()) sprungPuffer = 0.14;
   }
+  // Rutschen: am Boden flach machen, in der Luft schnell runter und dann rutschen
+  function rutsch() {
+    if (state !== "spiel" || schirmAn || (power && power.typ.id === "rentierflug") || geschleudert > 0) return;
+    if (amBoden) {
+      rutschen = E.rutschDauer;
+      for (let i = 0; i < 16; i++) { tmpFarbe.setRGB(0.85, 0.95, 1); funken.neu(pw.x + rand(-0.4, 0.4), pw.y + 0.1, pw.z + rand(-0.2, 0.4), rand(-2, 2), rand(1, 3), rand(-1, 2), tmpFarbe, 0.5, 6); }
+    } else {
+      p.vy = Math.min(p.vy, -16);
+      rutschPuffer = 0.4;
+    }
+  }
   function springen() {
     if (schirmAn || (power && power.typ.id === "rentierflug")) return false;
     if (amBoden || coyote > 0) {
       p.vy = E.sprungKraft;
-      amBoden = false; coyote = 0;
+      amBoden = false; coyote = 0; rutschen = 0;
       explosion(pw.x, pw.y + 0.1, pw.z, spurOderWeiss, 14, 3, 4, 0.5);
       return true;
     }
@@ -2135,6 +2170,7 @@ function starteCityJumper() {
       funken.neu(pw.x + rand(-0.4, 0.4), b.top + 0.1, pw.z + rand(-0.4, 0.4), rand(-3, 3), rand(1, 3), rand(-3, 3), tmpFarbe, rand(0.3, 0.6), 6);
     }
     if (hart) schuettel = Math.max(schuettel, 0.2);
+    if (rutschPuffer > 0) { rutschPuffer = 0; rutschen = E.rutschDauer; }
     if (sprungPuffer > 0) { sprungPuffer = 0; springen(); }
   }
 
@@ -2408,7 +2444,7 @@ function starteCityJumper() {
   // ===== Das Spiel Schritt für Schritt =====
   function spielUpdate(dt) {
     tempo = Math.min(E.maxTempo, tempo + E.beschleunigung * dt);
-    coyote -= dt; sprungPuffer -= dt; unverwundbar -= dt; geschleudert -= dt;
+    coyote -= dt; sprungPuffer -= dt; rutschen -= dt; rutschPuffer -= dt; unverwundbar -= dt; geschleudert -= dt;
     if (drehPuffer) { drehPuffer.t -= dt; if (drehPuffer.t <= 0) drehPuffer = null; else drehen(drehPuffer.r); }
     if (power) { power.rest -= dt; if (power.rest <= 0) powerEnde(); }
     const flug = power && power.typ.id === "rentierflug";
@@ -2502,6 +2538,13 @@ function starteCityJumper() {
     // Figur zeichnen
     if (amBoden) laufPhase += dt * tempo * 0.9;
     animiereFigur(figur, laufPhase, !amBoden, flug);
+    if (rutschen > 0 && amBoden) {
+      figur.gruppe.rotation.x = 1.25;      // nach hinten lehnen
+      figur.gruppe.position.y = 0.3;
+      figur.beine[0].rotation.x = figur.beine[1].rotation.x = -0.3;
+      figur.arme[0].rotation.x = figur.arme[1].rotation.x = -2.8;
+      if (Math.random() < 0.7) { tmpFarbe.setRGB(0.85, 0.95, 1); funken.neu(pw.x + rand(-0.3, 0.3), pw.y + 0.1, pw.z + 0.3, rand(-1.5, 1.5), rand(0.5, 2), rand(1, 3), tmpFarbe, 0.4, 5); }
+    } else { figur.gruppe.rotation.x = 0; figur.gruppe.position.y = 0; }
     spieler.position.copy(pw);
     let dw = pSeg.winkel - spielerWinkel;
     dw = Math.atan2(Math.sin(dw), Math.cos(dw));
@@ -2995,6 +3038,7 @@ function starteCityJumper() {
     if (pausiert) { if (k === " ") { e.preventDefault(); pause(false); } return; }
     if (k === "ArrowLeft" || k === "a" || k === "A") { tasten.links = true; if (!e.repeat) drehen(-1); }
     if (k === "ArrowRight" || k === "d" || k === "D") { tasten.rechts = true; if (!e.repeat) drehen(1); }
+    if ((k === "ArrowDown" || k === "s" || k === "S") && !e.repeat && state === "spiel") { e.preventDefault(); rutsch(); }
     if (k === " " || k === "ArrowUp" || k === "w" || k === "W" || k === "Enter") {
       if (document.activeElement && document.activeElement.tagName === "BUTTON" && k === "Enter") return;
       e.preventDefault();
@@ -3146,13 +3190,16 @@ function starteCityJumper() {
   knopf("k-links", () => { tasten.links = true; drehen(-1); }, () => { tasten.links = false; });
   knopf("k-rechts", () => { tasten.rechts = true; drehen(1); }, () => { tasten.rechts = false; });
   knopf("k-sprung", () => aktion());
+  knopf("k-rutsch", () => rutsch());
 
   // Wischen: tippen = springen, ziehen = laufen, schnell wischen = abbiegen
+  let wischStartY = 0, gerutscht = false;
   let zeigerX = null, wischStartX = 0, wischStartT = 0, gedreht = false;
   const flaeche = renderer.domElement;
   flaeche.addEventListener("pointerdown", e => {
     if (state !== "spiel" || mitKnoepfen()) return;
     zeigerX = wischStartX = e.clientX;
+    wischStartY = e.clientY; gerutscht = false;
     wischStartT = performance.now();
     gedreht = false;
     aktion();
@@ -3166,6 +3213,7 @@ function starteCityJumper() {
       gedreht = true;
       drehen(Math.sign(weg));
     }
+    if (!gerutscht && e.clientY - wischStartY > 45 && performance.now() - wischStartT < 400) { gerutscht = true; rutsch(); }
   });
   const loslassen = () => { zeigerX = null; };
   flaeche.addEventListener("pointerup", loslassen);
