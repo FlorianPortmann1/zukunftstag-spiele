@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zukunftstag-Spiele</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Startseite: zwei grosse Karten, eine pro Spiel */
+:root {
+  --bg: #f2f6fa;
+  --ink: #16213a;
+  --muted: #55607a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Nunito", system-ui, sans-serif;
+  padding: max(24px, env(safe-area-inset-top)) 16px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+h1 {
+  font-family: "Bowlby One", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(28px, 8vw, 44px);
+  margin: 8px 0 4px;
+  text-align: center;
+}
+p.unter { margin: 0 0 24px; color: var(--muted); text-align: center; font-weight: 600; }
+.karten { display: grid; gap: 16px; width: 100%; max-width: 520px; }
+a.karte {
+  display: block;
+  text-decoration: none;
+  border-radius: 20px;
+  padding: 22px 20px;
+  color: #fff;
+  box-shadow: 0 6px 0 rgba(0,0,0,.18);
+  transition: transform .1s;
+}
+a.karte:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+.karte .name { font-family: "Bowlby One", system-ui, sans-serif; font-size: 28px; }
+.karte .info { font-weight: 600; opacity: .92; margin-top: 4px; }
+.ski { background: linear-gradient(135deg, #2f7de1, #5bb6ff); }
+.neon { background: linear-gradient(135deg, #2a0a4a, #ff2fb2); }
+footer { margin-top: 28px; color: var(--muted); font-size: 14px; text-align: center; }
+</style>
+<body>
+  <h1>Zukunftstag-Spiele</h1>
+  <p class="unter">Gebaut mit KI · 12.11.2026</p>
+  <div class="karten">
+    <a class="karte ski" href="pistenflitzer.html">
+      <div class="name">⛷️ Pistenflitzer</div>
+      <div class="info">Skifahren, ausweichen, sammeln. Links oder rechts tippen.</div>
+    </a>
+    <a class="karte neon" href="neonflug.html">
+      <div class="name">🚀 Neonflug</div>
+      <div class="info">3D-Flug durch die Neon-Welt. Finger halten und ziehen.</div>
+    </a>
+  </div>
+  <footer>Tipp: «Zum Home-Bildschirm hinzufügen», dann ist das Spiel wie eine App.</footer>
+</body>
+</html>

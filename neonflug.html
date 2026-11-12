@@ -1,0 +1,664 @@
+<meta charset="utf-8">
+<title>Neonflug</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Audiowide&family=Chakra+Petch:wght@500;700&display=swap">
+<style>
+/* Layout: Vollbild-3D-Szene, Anzeige oben angeheftet, Start- und Crash-Karte mittig darüber. Bewusst nur ein dunkler Neon-Look. */
+:root {
+  --night: #0d0221;
+  --violet: #2a0a4a;
+  --pink: #ff2a9d;
+  --cyan: #29f0ff;
+  --sun: #ffb347;
+  --ink: #f4ecff;
+  --display: "Audiowide", "Arial Black", sans-serif;
+  --body: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+}
+[hidden] { display: none !important; }
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#stage canvas { display: block; width: 100%; height: 100%; }
+
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  pointer-events: none;
+}
+.stat { display: grid; gap: 2px; }
+.stat.right { justify-items: end; text-align: right; }
+.label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+}
+.value {
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: clamp(1.3rem, 5vw, 2rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(255, 42, 157, 0.7);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: radial-gradient(ellipse at center, rgba(13, 2, 33, 0.45), rgba(13, 2, 33, 0.88));
+}
+.card {
+  max-width: 30rem;
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  text-align: center;
+}
+h1, h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1;
+  text-wrap: balance;
+}
+h1 {
+  font-size: clamp(3rem, 13vw, 5.6rem);
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #ffffff 10%, var(--cyan) 50%, var(--pink) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(255, 42, 157, 0.55));
+}
+h2 {
+  font-size: clamp(2.4rem, 10vw, 4rem);
+  color: var(--pink);
+  text-shadow: 0 0 20px rgba(255, 42, 157, 0.8);
+}
+.card p { margin: 0; font-size: 1.05rem; line-height: 1.5; font-weight: 500; }
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 1px 6px;
+  border: 1px solid var(--cyan);
+  border-radius: 6px;
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 0.9em;
+  color: var(--cyan);
+  background: rgba(41, 240, 255, 0.08);
+}
+.result {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 10vw, 3.6rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.go {
+  font: 400 1.3rem var(--display);
+  color: #fff;
+  background: rgba(255, 42, 157, 0.15);
+  border: 2px solid var(--pink);
+  border-radius: 999px;
+  padding: 14px 36px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(255, 42, 157, 0.7), inset 0 0 14px rgba(255, 42, 157, 0.45);
+  transition: transform 0.1s, background 0.2s;
+}
+.go:hover { background: rgba(255, 42, 157, 0.3); }
+.go:active { transform: scale(0.97); }
+.go:focus-visible { outline: 3px solid var(--cyan); outline-offset: 4px; }
+.hint { font-size: 0.85rem !important; color: var(--cyan); opacity: 0.85; }
+.fehler { color: var(--sun); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .go { transition: none; }
+}
+</style>
+
+<div id="stage">
+  <div class="hud">
+    <div class="stat"><span class="label">Strecke</span><span id="meters" class="value">0 m</span></div>
+    <div class="stat"><span class="label">Kristalle</span><span id="crystals" class="value">0</span></div>
+    <div class="stat"><span class="label">Tempo</span><span id="kmh" class="value">0 km/h</span></div>
+    <div class="stat right"><span class="label">Rekord</span><span id="best" class="value">0 m</span></div>
+  </div>
+
+  <div id="start" class="overlay">
+    <div class="card">
+      <h1>Neonflug</h1>
+      <p>Flieg durch die Neonwelt, sammle Kristalle und weich den Blöcken aus. Bei Mauern musst du genau durchs Loch!</p>
+      <p>Steuern mit <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> oder <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>.<br>
+        <kbd>Leertaste</kbd> = Fassrolle, macht dich kurz unverwundbar.<br>
+        Auf dem Handy: Finger auf den Bildschirm halten und ziehen.</p>
+      <button id="start-btn" class="go" type="button">Abheben!</button>
+      <p id="load-error" class="fehler" hidden>Die 3D-Grafik konnte nicht geladen werden. Prüf die Internetverbindung und lade die Seite neu.</p>
+    </div>
+  </div>
+
+  <div id="over" class="overlay" hidden>
+    <div class="card">
+      <h2>Kaboom!</h2>
+      <div class="result" id="result">0 m</div>
+      <p id="loot-text">0 Kristalle</p>
+      <p id="record-text">Rekord: 0 m</p>
+      <button id="again-btn" class="go" type="button">Nochmal!</button>
+      <p class="hint">Oder <kbd>Leertaste</kbd> drücken</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== Regler zum Ausprobieren =====
+const EINSTELLUNGEN = {
+  startTempo: 40,        // Meter pro Sekunde am Anfang
+  maxTempo: 110,         // schneller wird es nicht
+  beschleunigung: 1.2,   // wie schnell es schneller wird
+  steuerTempo: 14,       // wie schnell das Schiff zur Seite und nach oben/unten fliegt
+  blockDichte: 0.06,     // Blöcke pro Meter
+  kristallDichte: 0.035, // Kristalle pro Meter
+  mauerAbstand: 160,     // alle so viele Meter kommt eine Mauer mit Loch
+  rollDauer: 0.6,        // Sekunden, die eine Fassrolle dauert
+  rollPause: 1.5         // Sekunden bis zur nächsten Fassrolle
+};
+const BREITE = 9;        // so weit darf das Schiff nach links und rechts
+const HOEHE_MIN = 1;
+const HOEHE_MAX = 8;
+const SPAWN_Z = -170;    // hier tauchen neue Dinge auf
+
+const $ = id => document.getElementById(id);
+const ui = {
+  meters: $("meters"), crystals: $("crystals"), kmh: $("kmh"), best: $("best"),
+  start: $("start"), over: $("over"), result: $("result"), lootText: $("loot-text"), recordText: $("record-text")
+};
+
+if (!window.THREE) {
+  $("load-error").hidden = false;
+  $("start-btn").hidden = true;
+} else {
+  starteNeonflug();
+}
+
+function starteNeonflug() {
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ===== Szene, Kamera, Licht =====
+  const stage = $("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  stage.prepend(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d0221);
+  scene.fog = new THREE.Fog(0x0d0221, 50, 175);
+
+  const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 400);
+  camera.position.set(0, 5, 9);
+
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  scene.add(new THREE.HemisphereLight(0xff6ad5, 0x1a0033, 0.9));
+  const sonne = new THREE.DirectionalLight(0xffffff, 0.8);
+  sonne.position.set(5, 10, 7);
+  scene.add(sonne);
+
+  // ===== Texturen aus Canvas (Glühen und Retro-Sonne) =====
+  function glowTexture() {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 64;
+    const c = cv.getContext("2d");
+    const g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.3, "rgba(255,255,255,0.5)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = g;
+    c.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  }
+  function sunTexture() {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 512;
+    const c = cv.getContext("2d");
+    const g = c.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0, "#ffe66d");
+    g.addColorStop(0.5, "#ffb347");
+    g.addColorStop(1, "#ff2a9d");
+    c.fillStyle = g;
+    c.beginPath(); c.arc(256, 256, 250, 0, Math.PI * 2); c.fill();
+    // Streifen in der unteren Hälfte
+    c.globalCompositeOperation = "destination-out";
+    for (let i = 0; i < 8; i++) {
+      const y = 280 + i * 28;
+      c.fillRect(0, y, 512, 4 + i * 2.2);
+    }
+    return new THREE.CanvasTexture(cv);
+  }
+  const GLOW = glowTexture();
+  const glowMat = farbe => new THREE.SpriteMaterial({
+    map: GLOW, color: farbe, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+
+  const sun = new THREE.Mesh(
+    new THREE.PlaneGeometry(130, 130),
+    new THREE.MeshBasicMaterial({ map: sunTexture(), transparent: true, fog: false })
+  );
+  sun.position.set(0, 26, -300);
+  scene.add(sun);
+  camera.far = 400;
+
+  // ===== Boden: leuchtendes Gitter =====
+  const grid = new THREE.GridHelper(400, 80, 0xff2a9d, 0xff2a9d);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.55;
+  scene.add(grid);
+  const boden = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: 0x12032b }));
+  boden.rotation.x = -Math.PI / 2;
+  boden.position.y = -0.05;
+  scene.add(boden);
+
+  // ===== Drahtgitter-Berge links und rechts =====
+  const bergMat = new THREE.MeshBasicMaterial({ color: 0x29f0ff, wireframe: true, transparent: true, opacity: 0.45 });
+  const berge = [];
+  for (let i = 0; i < 18; i++) {
+    const h = rand(10, 28);
+    const berg = new THREE.Mesh(new THREE.ConeGeometry(rand(8, 14), h, 4), bergMat);
+    const seite = i % 2 ? 1 : -1;
+    berg.position.set(seite * rand(22, 55), h / 2, rand(-260, 10));
+    berg.rotation.y = rand(0, Math.PI);
+    scene.add(berg);
+    berge.push(berg);
+  }
+
+  // ===== Das Raumschiff =====
+  const ship = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8e8ff, metalness: 0.3, roughness: 0.4, flatShading: true });
+  const pinkMat = new THREE.MeshStandardMaterial({ color: 0xff2a9d, emissive: 0xff2a9d, emissiveIntensity: 0.6, flatShading: true });
+  const cyanMat = new THREE.MeshStandardMaterial({ color: 0x29f0ff, emissive: 0x29f0ff, emissiveIntensity: 0.8 });
+
+  const rumpf = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3, 6), bodyMat);
+  rumpf.rotation.x = -Math.PI / 2; // Spitze zeigt nach vorne
+  ship.add(rumpf);
+  const fluegel = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 1.1), pinkMat);
+  fluegel.position.set(0, -0.1, 0.6);
+  ship.add(fluegel);
+  for (const s of [-1, 1]) {
+    const flosse = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 0.8), pinkMat);
+    flosse.position.set(s * 1.8, 0.25, 0.8);
+    ship.add(flosse);
+  }
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 8), cyanMat);
+  cockpit.position.set(0, 0.3, -0.1);
+  cockpit.scale.z = 1.7;
+  ship.add(cockpit);
+  const duese = new THREE.Sprite(glowMat(0x29f0ff));
+  duese.position.set(0, 0, 1.6);
+  duese.scale.set(1.8, 1.8, 1);
+  ship.add(duese);
+  scene.add(ship);
+
+  // ===== Spielzustand =====
+  function loadBest() {
+    try { return Number(localStorage.getItem("neonflug-rekord")) || 0; } catch (e) { return 0; }
+  }
+  function saveBest(m) {
+    try { localStorage.setItem("neonflug-rekord", String(m)); } catch (e) {}
+  }
+
+  const state = {
+    mode: "start",  // start, fliegen, crash
+    x: 0, y: 3.5, vx: 0, vy: 0, speed: 0, dist: 0, scroll: 0, t: 0,
+    crystals: 0, roll: 0, rollPause: 0, crashTime: 0, shake: 0,
+    best: loadBest(), target: null,
+    blockBudget: 0, kristallBudget: 0, naechsteMauer: 0
+  };
+  const keys = { left: false, right: false, up: false, down: false };
+  const blocks = [];
+  const kristalle = [];
+  const funken = [];
+
+  // ===== Blöcke und Mauern =====
+  const blockMat = new THREE.MeshStandardMaterial({ color: 0x1a0638, emissive: 0x2a0a4a, flatShading: true });
+  const pinkLine = new THREE.LineBasicMaterial({ color: 0xff2a9d });
+  const cyanLine = new THREE.LineBasicMaterial({ color: 0x29f0ff });
+
+  function addBox(x, y, w, h, d, z, line) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, blockMat);
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), line));
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
+    blocks.push({ mesh, hx: w / 2, hy: h / 2, hz: d / 2 });
+  }
+  function spawnBlock(z) {
+    if (Math.random() < 0.5) {
+      // Säule vom Boden aus
+      const h = rand(4, 10), w = rand(1.5, 3.5);
+      addBox(rand(-BREITE, BREITE), h / 2, w, h, w, z, pinkLine);
+    } else {
+      // schwebender Würfel
+      const s = rand(1.5, 3.5);
+      addBox(rand(-BREITE, BREITE), rand(HOEHE_MIN + 1, HOEHE_MAX), s, s, s, z, cyanLine);
+    }
+  }
+  function spawnMauer(z) {
+    const gx = rand(-BREITE + 3, BREITE - 3), gy = rand(2.5, HOEHE_MAX - 1.5);
+    const gw = 5, gh = 3.6;
+    const L = -BREITE - 4, R = BREITE + 4, T = HOEHE_MAX + 4;
+    addBox((L + gx - gw / 2) / 2, T / 2, gx - gw / 2 - L, T, 1, z, pinkLine);
+    addBox((gx + gw / 2 + R) / 2, T / 2, R - (gx + gw / 2), T, 1, z, pinkLine);
+    addBox(gx, (gy - gh / 2) / 2, gw, gy - gh / 2, 1, z, pinkLine);
+    addBox(gx, (gy + gh / 2 + T) / 2, gw, T - (gy + gh / 2), 1, z, pinkLine);
+    spawnKristall(gx, gy, z); // Belohnung im Loch
+    // vor und hinter der Mauer Platz lassen
+    for (const b of blocks) if (Math.abs(b.mesh.position.z - z) < 12 && b.hz > 0.5) b.weg = true;
+  }
+
+  // ===== Kristalle =====
+  const kristallGeo = new THREE.OctahedronGeometry(0.7);
+  const kristallMat = new THREE.MeshStandardMaterial({ color: 0x29f0ff, emissive: 0x29f0ff, emissiveIntensity: 0.9, flatShading: true });
+  const kristallGlow = glowMat(0x29f0ff);
+  function spawnKristall(x, y, z) {
+    const m = new THREE.Mesh(kristallGeo, kristallMat);
+    const glow = new THREE.Sprite(kristallGlow);
+    glow.scale.set(2.6, 2.6, 1);
+    m.add(glow);
+    m.position.set(x, y, z);
+    scene.add(m);
+    kristalle.push(m);
+  }
+  function spawnKristallReihe(z) {
+    const x = rand(-BREITE + 1, BREITE - 1), y = rand(HOEHE_MIN + 0.5, HOEHE_MAX - 0.5);
+    const n = Math.random() < 0.5 ? 5 : 1;
+    for (let i = 0; i < n; i++) spawnKristall(clamp(x + Math.sin(i * 0.8) * 2, -BREITE, BREITE), y, z - i * 4);
+  }
+
+  // ===== Funken (Düse und Explosion) =====
+  const funkenGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  const funkenMats = [0xff2a9d, 0x29f0ff, 0xffb347].map(c => new THREE.MeshBasicMaterial({ color: c, transparent: true }));
+  const dueseMat = glowMat(0xff2a9d);
+  function spawnDuesenFunke() {
+    const s = new THREE.Sprite(dueseMat.clone());
+    s.position.set(state.x + rand(-0.15, 0.15), state.y + rand(-0.15, 0.15), 1.8);
+    s.scale.set(1.2, 1.2, 1);
+    scene.add(s);
+    funken.push({ obj: s, vx: 0, vy: 0, vz: 10, life: 0.35, max: 0.35, sprite: true });
+  }
+  function explosion(x, y, z, n) {
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(funkenGeo, funkenMats[i % 3].clone());
+      m.position.set(x, y, z);
+      scene.add(m);
+      funken.push({ obj: m, vx: rand(-14, 14), vy: rand(-4, 16), vz: rand(-14, 14), life: 1.3, max: 1.3, sprite: false });
+    }
+  }
+
+  function entferne(obj) {
+    scene.remove(obj);
+  }
+
+  // ===== Spielablauf =====
+  function clearWorld() {
+    for (const b of blocks) { entferne(b.mesh); b.mesh.geometry.dispose(); }
+    blocks.length = 0;
+    for (const k of kristalle) entferne(k);
+    kristalle.length = 0;
+    for (const f of funken) entferne(f.obj);
+    funken.length = 0;
+  }
+
+  function startGame() {
+    clearWorld();
+    Object.assign(state, {
+      mode: "fliegen", x: 0, y: 3.5, vx: 0, vy: 0, speed: EINSTELLUNGEN.startTempo, dist: 0, crystals: 0,
+      roll: 0, rollPause: 0, target: null, blockBudget: 0, kristallBudget: 0, naechsteMauer: EINSTELLUNGEN.mauerAbstand
+    });
+    ship.visible = true;
+    ui.start.hidden = true;
+    ui.over.hidden = true;
+  }
+
+  function crash() {
+    state.mode = "crash";
+    state.crashTime = performance.now();
+    state.shake = 0.6;
+    ship.visible = false;
+    explosion(state.x, state.y, 0, 60);
+    const m = Math.floor(state.dist);
+    const neu = m > state.best;
+    if (neu) { state.best = m; saveBest(m); }
+    ui.result.textContent = m + " m";
+    ui.lootText.textContent = state.crystals + (state.crystals === 1 ? " Kristall" : " Kristalle") + " gesammelt";
+    ui.recordText.textContent = neu ? "Neuer Rekord!" : "Rekord: " + state.best + " m";
+    setTimeout(() => { ui.over.hidden = false; $("again-btn").focus(); }, 1000);
+  }
+
+  function steuern(dt) {
+    let ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    let iy = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
+    if (state.target) {
+      ix = clamp((state.target.x - state.x) / 2, -1, 1);
+      iy = clamp((state.target.y - state.y) / 2, -1, 1);
+    }
+    const k = Math.min(1, dt * 8);
+    state.vx += (ix * EINSTELLUNGEN.steuerTempo - state.vx) * k;
+    state.vy += (iy * EINSTELLUNGEN.steuerTempo * 0.8 - state.vy) * k;
+    state.x = clamp(state.x + state.vx * dt, -BREITE, BREITE);
+    state.y = clamp(state.y + state.vy * dt, HOEHE_MIN, HOEHE_MAX);
+  }
+
+  function spawnen(dz) {
+    state.blockBudget += dz * EINSTELLUNGEN.blockDichte * (1 + state.dist / 3000);
+    while (state.blockBudget >= 1) { spawnBlock(SPAWN_Z - rand(0, 20)); state.blockBudget -= 1; }
+    state.kristallBudget += dz * EINSTELLUNGEN.kristallDichte;
+    while (state.kristallBudget >= 1) { spawnKristallReihe(SPAWN_Z - rand(0, 20)); state.kristallBudget -= 1; }
+    if (state.dist >= state.naechsteMauer) {
+      spawnMauer(SPAWN_Z - 25);
+      state.naechsteMauer += EINSTELLUNGEN.mauerAbstand * rand(0.8, 1.3);
+    }
+  }
+
+  function kollisionen() {
+    if (state.roll <= 0) {
+      for (const b of blocks) {
+        const p = b.mesh.position;
+        if (Math.abs(p.x - state.x) < b.hx + 1.1 &&
+            Math.abs(p.y - state.y) < b.hy + 0.35 &&
+            Math.abs(p.z) < b.hz + 1.2) { crash(); return; }
+      }
+    }
+    for (const k of kristalle) {
+      const p = k.position;
+      if (Math.abs(p.z) < 2 && Math.hypot(p.x - state.x, p.y - state.y) < 1.9) {
+        k.weg = true;
+        state.crystals++;
+        explosion(p.x, p.y, p.z, 6);
+      }
+    }
+  }
+
+  function bewegeWelt(dz, dt) {
+    state.scroll += dz;
+    grid.position.z = (state.scroll % 5) - 150;
+    boden.position.z = -150;
+    for (const b of berge) {
+      b.position.z += dz * 0.5;
+      if (b.position.z > 20) b.position.z -= 280;
+    }
+    for (const b of blocks) {
+      b.mesh.position.z += dz;
+      if (b.mesh.position.z > 15) b.weg = true;
+    }
+    for (const k of kristalle) {
+      k.position.z += dz;
+      k.rotation.y += dt * 2.5;
+      k.position.y += Math.sin(state.t * 3 + k.position.z * 0.2) * dt * 0.6;
+      if (k.position.z > 3) k.weg = true; // hinter dem Schiff: weg, sonst blendet das Leuchten die Kamera
+    }
+    for (const f of funken) {
+      f.life -= dt;
+      f.obj.position.x += f.vx * dt;
+      f.obj.position.y += f.vy * dt;
+      f.obj.position.z += f.vz * dt + (f.sprite ? 0 : dz);
+      if (!f.sprite) { f.vy -= 20 * dt; f.obj.rotation.x += dt * 6; f.obj.rotation.y += dt * 5; }
+      const a = Math.max(0, f.life / f.max);
+      f.obj.material.opacity = a;
+      if (f.sprite) f.obj.scale.setScalar(1.2 * a + 0.2);
+      if (f.life <= 0) f.weg = true;
+    }
+    aufraeumen(blocks, b => b.mesh, true);
+    aufraeumen(kristalle, k => k, false);
+    aufraeumen(funken, f => f.obj, false, true);
+  }
+
+  function aufraeumen(liste, objekt, geometrieWeg, materialWeg) {
+    for (let i = liste.length - 1; i >= 0; i--) {
+      const el = liste[i];
+      if (!el.weg) continue;
+      const o = objekt(el);
+      entferne(o);
+      if (geometrieWeg) o.geometry.dispose();
+      if (materialWeg) o.material.dispose();
+      liste.splice(i, 1);
+    }
+  }
+
+  function update(dt) {
+    let dz = 0;
+    if (state.mode === "fliegen") {
+      steuern(dt);
+      state.speed = Math.min(EINSTELLUNGEN.maxTempo, state.speed + EINSTELLUNGEN.beschleunigung * dt);
+      dz = state.speed * dt;
+      state.dist += dz;
+      if (state.roll > 0) state.roll -= dt;
+      if (state.rollPause > 0) state.rollPause -= dt;
+      spawnen(dz);
+      if (Math.random() < 0.8) spawnDuesenFunke();
+    } else if (state.mode === "start") {
+      // Schiff fliegt im Startbildschirm von allein
+      state.x = Math.sin(state.t * 0.7) * 4;
+      state.y = 3.5 + Math.sin(state.t * 1.1);
+      state.vx = Math.cos(state.t * 0.7) * 2.8;
+      dz = 25 * dt;
+      state.kristallBudget += dz * EINSTELLUNGEN.kristallDichte;
+      while (state.kristallBudget >= 1) { spawnKristallReihe(SPAWN_Z); state.kristallBudget -= 1; }
+      if (Math.random() < 0.6) spawnDuesenFunke();
+    }
+    bewegeWelt(dz, dt);
+    if (state.mode === "fliegen") kollisionen();
+
+    // Schiff und Kamera
+    const rollWinkel = state.roll > 0 ? (1 - state.roll / EINSTELLUNGEN.rollDauer) * Math.PI * 2 : 0;
+    ship.position.set(state.x, state.y, 0);
+    ship.rotation.z = -state.vx * 0.05 - rollWinkel;
+    ship.rotation.x = state.vy * 0.03;
+    duese.scale.setScalar(1.6 + Math.random() * 0.5);
+
+    const k = Math.min(1, dt * 5);
+    camera.position.x += (state.x * 0.6 - camera.position.x) * k;
+    camera.position.y += (state.y + 2.6 - camera.position.y) * k;
+    camera.position.z = 8.5;
+    if (state.shake > 0) {
+      state.shake -= dt;
+      camera.position.x += rand(-0.4, 0.4) * state.shake;
+      camera.position.y += rand(-0.4, 0.4) * state.shake;
+    }
+    camera.lookAt(state.x * 0.8, state.y * 0.8 + 0.5, -25);
+  }
+
+  function updateHud() {
+    ui.meters.textContent = Math.floor(state.dist) + " m";
+    ui.crystals.textContent = state.crystals;
+    ui.kmh.textContent = Math.round((state.mode === "fliegen" ? state.speed : 0) * 3.6) + " km/h";
+    ui.best.textContent = state.best + " m";
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000);
+    last = now;
+    state.t += dt;
+    update(reduceMotion && state.mode === "start" ? 0 : dt);
+    updateHud();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  // ===== Steuerung =====
+  const KEYMAP = {
+    ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right",
+    ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down"
+  };
+  function fassrolle() {
+    if (state.mode !== "fliegen" || state.rollPause > 0) return;
+    state.roll = EINSTELLUNGEN.rollDauer;
+    state.rollPause = EINSTELLUNGEN.rollPause;
+  }
+  window.addEventListener("keydown", e => {
+    if (e.target.closest && e.target.closest("button") && (e.code === "Space" || e.code === "Enter")) return;
+    if (KEYMAP[e.code] || e.code === "Space") e.preventDefault();
+    if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = true;
+    if (e.code === "Space" && state.mode === "fliegen") { fassrolle(); return; }
+    const wait = state.mode === "crash" && performance.now() - state.crashTime < 1000;
+    if ((e.code === "Space" || e.code === "Enter") && state.mode !== "fliegen" && !wait && !e.repeat) startGame();
+  });
+  window.addEventListener("keyup", e => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
+  window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
+
+  const cv = renderer.domElement;
+  function zeigerZiel(e) {
+    const r = cv.getBoundingClientRect();
+    const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
+    state.target = {
+      x: (nx * 2 - 1) * BREITE * 1.15,
+      y: HOEHE_MAX - ny * (HOEHE_MAX - HOEHE_MIN) * 1.2 + 1
+    };
+  }
+  cv.addEventListener("pointerdown", e => { if (state.mode === "fliegen") zeigerZiel(e); });
+  cv.addEventListener("pointermove", e => { if (state.target) zeigerZiel(e); });
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) cv.addEventListener(ev, () => { state.target = null; });
+
+  $("start-btn").addEventListener("click", startGame);
+  $("again-btn").addEventListener("click", startGame);
+
+  // für Tests in der Konsole
+  window.neonflug = { state, startGame, update, blocks, kristalle };
+
+  requestAnimationFrame(frame);
+}
+</script>

@@ -1,0 +1,1584 @@
+<!doctype html>
+<html lang="de">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta charset="utf-8">
+<title>Pistenflitzer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: Vollbild-Piste als Canvas, Anzeige oben angeheftet, Karten (Start, Crash, Ausrüstung, Itemshop) darüber */
+:root {
+  --snow: #f2f6fa;
+  --shade: #dbe5ef;
+  --ink: #14233a;
+  --pine: #1e5844;
+  --signal: #d7261e;
+  --blue: #1f6fd1;
+  --display: "Bowlby One", "Arial Black", Impact, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body {
+  background: var(--snow);
+  color: var(--ink);
+  font-family: var(--body);
+  overflow: hidden;
+}
+[hidden] { display: none !important; }
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#piste { display: block; width: 100%; height: 100%; }
+
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  pointer-events: none;
+}
+.stat { display: grid; gap: 2px; justify-items: start; }
+.stat.right { justify-items: end; text-align: right; }
+.label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  opacity: 0.7;
+}
+.value {
+  font-family: var(--display);
+  font-size: clamp(1.3rem, 5vw, 1.9rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 0 var(--shade);
+  font: 400 1.05rem var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.shield-hud {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #4cc3ff;
+  color: var(--ink);
+  font: 800 0.72rem var(--body);
+}
+.piste {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+.piste i {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--blue);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(242, 246, 250, 0.78);
+  backdrop-filter: blur(2px);
+}
+.card {
+  max-width: 28rem;
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  text-align: center;
+}
+h1, h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 0.95;
+  text-wrap: balance;
+}
+h1 { font-size: clamp(2.6rem, 11vw, 4.4rem); color: var(--ink); }
+h1 span { color: var(--signal); }
+h2 { font-size: clamp(2rem, 8vw, 3rem); color: var(--signal); }
+.card p { margin: 0; font-size: 1.05rem; line-height: 1.5; font-weight: 600; }
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 1px 6px;
+  border: 2px solid var(--ink);
+  border-bottom-width: 4px;
+  border-radius: 6px;
+  font-family: var(--body);
+  font-weight: 800;
+  font-size: 0.9em;
+  background: #fff;
+}
+.result {
+  font-family: var(--display);
+  font-size: clamp(2.4rem, 10vw, 3.6rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.go {
+  font: 400 1.3rem var(--display);
+  color: #fff;
+  background: var(--signal);
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 34px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #8f1813;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.go:active { transform: translateY(4px); box-shadow: 0 1px 0 #8f1813; }
+.go:focus-visible, .ghost:focus-visible, .buy:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.go.small { font-size: 1rem; padding: 10px 24px; }
+.ghost {
+  font: 800 1rem var(--body);
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 11px 20px;
+  cursor: pointer;
+}
+.hint { font-size: 0.85rem !important; opacity: 0.7; }
+
+/* Ausrüstung und Itemshop */
+.shop {
+  place-items: start center;
+  overflow-y: auto;
+  padding-block: 24px;
+  background: rgba(242, 246, 250, 0.96);
+}
+.shop-panel { width: 100%; max-width: 44rem; display: grid; gap: 14px; }
+.shop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.shop h2 { color: var(--ink); }
+.shop-sub { margin: 0; font-weight: 600; }
+.shop h3 {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+.skins {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.skin {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 6px 10px;
+  background: #fff;
+  border: 2px solid var(--shade);
+  border-radius: 12px;
+  font: 800 0.82rem var(--body);
+  color: var(--ink);
+  cursor: pointer;
+}
+.skin canvas { width: 80px; height: 80px; border-radius: 8px; }
+.skin small { font-weight: 600; font-size: 0.7rem; opacity: 0.7; }
+.skin:hover { border-color: var(--ink); }
+.skin[aria-pressed="true"] { border-color: var(--signal); box-shadow: inset 0 0 0 2px var(--signal); }
+.skin[aria-pressed="true"]::after {
+  content: "An";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--signal);
+  color: #fff;
+  font-size: 0.68rem;
+}
+.skin:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.purse {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 8px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  font: 400 1.3rem var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.purse small { font: 800 0.85rem var(--body); opacity: 0.7; }
+.items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+@property --winkel {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.item-card {
+  --r: #7d8794;
+  position: relative;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 12px;
+  background: #fff;
+  border: 2px solid var(--shade);
+  border-radius: 16px;
+}
+.item-card h4 { margin: 0; font: 400 1.05rem var(--display); overflow-wrap: anywhere; hyphens: auto; }
+.item-card p { margin: 0; font-size: 0.85rem; font-weight: 600; line-height: 1.4; }
+.item-preview { display: block; width: 100%; height: 110px; border-radius: 10px; }
+.rarity {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--r);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.r-selten { --r: #1f6fd1; border-color: #1f6fd1; }
+.r-episch {
+  --r: #8b3fd9;
+  border-color: #8b3fd9;
+  box-shadow: 0 0 0 3px rgba(139, 63, 217, 0.15), 0 6px 18px rgba(139, 63, 217, 0.25);
+}
+.r-legendaer {
+  --r: #e8a317;
+  border: 3px solid transparent;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    conic-gradient(from var(--winkel), #e8a317, #ff5e3a, #ffe680, #ff9de2, #e8a317) border-box;
+  box-shadow: 0 6px 22px rgba(232, 163, 23, 0.35);
+  animation: drehen 3s linear infinite;
+}
+.r-legendaer .rarity { background: linear-gradient(90deg, #e8a317, #ff5e3a); }
+@keyframes drehen { to { --winkel: 360deg; } }
+.buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--signal);
+  color: #fff;
+  font: 400 1rem var(--display);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #8f1813;
+}
+.buy canvas { width: 18px; height: 18px; }
+.buy:disabled { background: #c9d2dc; color: #5b6878; box-shadow: 0 4px 0 #a9b4c0; cursor: not-allowed; }
+.buy.owned { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
+.buy.active { background: #1e8a4c; box-shadow: 0 4px 0 #11592f; }
+.owned-note { min-height: 1.1em; font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-align: center; }
+.pop { animation: pop 0.5s ease-out; }
+@keyframes pop {
+  40% { transform: scale(1.06) rotate(-1deg); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .r-legendaer, .pop { animation: none; }
+}
+</style>
+
+<div id="stage">
+  <canvas id="piste" aria-label="Skipiste"></canvas>
+
+  <div class="hud">
+    <div class="stat">
+      <span class="label">Strecke</span>
+      <span id="meters" class="value">0 m</span>
+      <span class="wallet"><canvas id="wallet-icon"></canvas><span id="coins">0</span><span id="shield-hud" class="shield-hud" hidden>Schild × <span id="shield-count">0</span></span></span>
+    </div>
+    <div class="stat"><span class="label">Tempo</span><span id="kmh" class="value">0 km/h</span></div>
+    <div class="stat right">
+      <span id="piste-name" class="piste"><i id="piste-color"></i><b>Blaue Piste</b></span>
+      <span class="label">Rekord <span id="best">0 m</span></span>
+    </div>
+  </div>
+
+  <div id="start" class="overlay">
+    <div class="card">
+      <h1>Pisten<span>flitzer</span></h1>
+      <p>Fahr so weit wie möglich den Berg hinunter, sammle Schätze ein und weich den Tannen, Steinen und Schneemännern aus!</p>
+      <p>Steuern mit <kbd>←</kbd> <kbd>→</kbd> oder <kbd>A</kbd> <kbd>D</kbd>.<br>Auf dem Handy: links oder rechts tippen.</p>
+      <div class="buttons">
+        <button id="start-btn" class="go" type="button">Los geht’s!</button>
+        <button class="ghost open-shop" type="button">Ausrüstung: <span class="skin-name">Schweiz</span></button>
+        <button class="ghost open-laden" type="button">Itemshop</button>
+      </div>
+      <p class="hint">Was du einsammelst, hängt von deiner Jacke ab. Damit kaufst du im Itemshop coole Sachen.</p>
+    </div>
+  </div>
+
+  <div id="over" class="overlay" hidden>
+    <div class="card">
+      <h2 id="crash-text">Autsch!</h2>
+      <div class="result" id="result">0 m</div>
+      <p id="loot-text">+0 eingesammelt</p>
+      <p id="record-text">Rekord: 0 m</p>
+      <div class="buttons">
+        <button id="again-btn" class="go" type="button">Nochmal!</button>
+        <button class="ghost open-shop" type="button">Ausrüstung: <span class="skin-name">Schweiz</span></button>
+        <button class="ghost open-laden" type="button">Itemshop</button>
+      </div>
+      <p class="hint">Oder <kbd>Leertaste</kbd> drücken</p>
+    </div>
+  </div>
+
+  <div id="shop" class="overlay shop" hidden>
+    <div class="shop-panel">
+      <div class="shop-head">
+        <h2>Ausrüstung</h2>
+        <button class="go small close-panel" type="button">Fertig</button>
+      </div>
+      <p class="shop-sub">Tipp auf eine Jacke, um sie anzuziehen. Jede Jacke sammelt etwas anderes ein.</p>
+      <div id="shop-list"></div>
+    </div>
+  </div>
+
+  <div id="laden" class="overlay shop" hidden>
+    <div class="shop-panel">
+      <div class="shop-head">
+        <h2>Itemshop</h2>
+        <button class="go small close-panel" type="button">Fertig</button>
+      </div>
+      <div class="purse"><canvas id="purse-icon"></canvas><span id="purse-count">0</span><small id="purse-name">Käse</small></div>
+      <p class="shop-sub">Alles, was du auf der Piste einsammelst, zählt hier als Geld.</p>
+      <div id="laden-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Regler zum Ausprobieren =====
+const EINSTELLUNGEN = {
+  startTempo: 260,        // Pixel pro Sekunde am Anfang
+  maxTempo: 720,          // schneller wird es nicht
+  beschleunigung: 12,     // wie schnell es schneller wird
+  lenkTempo: 330,         // wie schnell der Skifahrer zur Seite fährt
+  hindernisDichte: 0.010, // wie viele Hindernisse auftauchen
+  itemDichte: 0.0035,     // wie viele Sammel-Items auftauchen
+  magnetRadius: 120       // so weit zieht der Supermagnet
+};
+
+const PISTEN = [
+  { ab: 0,    name: "Blaue Piste",    farbe: "#1f6fd1" },
+  { ab: 400,  name: "Rote Piste",     farbe: "#d7261e" },
+  { ab: 1000, name: "Schwarze Piste", farbe: "#14233a" }
+];
+
+// ===== Zeichen-Helfer =====
+// Die Jacke ist eine Fläche von 16 x 20 Pixeln (x: -8 bis 8, y: -6 bis 14).
+const JACKE = { x: -8, y: -6, w: 16, h: 20 };
+
+function flaeche(c, farbe) {
+  c.fillStyle = farbe;
+  c.fillRect(JACKE.x, JACKE.y, JACKE.w, JACKE.h);
+}
+function streifenQuer(c, farben) {
+  const h = JACKE.h / farben.length;
+  farben.forEach((f, i) => { c.fillStyle = f; c.fillRect(JACKE.x, JACKE.y + i * h, JACKE.w, h + 0.5); });
+}
+function streifenLaengs(c, farben) {
+  const w = JACKE.w / farben.length;
+  farben.forEach((f, i) => { c.fillStyle = f; c.fillRect(JACKE.x + i * w, JACKE.y, w + 0.5, JACKE.h); });
+}
+// Kreuz über die ganze Jacke (für die nordischen Flaggen etwas nach links verschoben)
+function kreuz(c, farbe, dicke, cx = -2, cy = 3) {
+  c.fillStyle = farbe;
+  c.fillRect(JACKE.x, cy - dicke / 2, JACKE.w, dicke);
+  c.fillRect(cx - dicke / 2, JACKE.y, dicke, JACKE.h);
+}
+function kreis(c, x, y, r, farbe) {
+  c.fillStyle = farbe;
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+}
+function kugel(c, x, y, r, farbe, rand) {
+  kreis(c, x, y, r, farbe);
+  c.strokeStyle = rand; c.lineWidth = 1; c.stroke();
+}
+function stern(c, x, y, r, farbe, rand) {
+  c.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rr = i % 2 ? r * 0.42 : r;
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  c.closePath();
+  c.fillStyle = farbe;
+  c.fill();
+  if (rand) { c.strokeStyle = rand; c.lineWidth = 0.8; c.stroke(); }
+}
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+// ===== Sammel-Items: jede Jacke sammelt etwas anderes =====
+// Jedes Item ist etwa 18 x 18 Pixel gross, (0, 0) ist die Mitte.
+const ITEMS = {
+  kaese: { name: "Käse", draw: c => {
+    c.fillStyle = "#ffcf3f"; c.strokeStyle = "#b07d10"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-9, 6); c.lineTo(9, 6); c.lineTo(9, -7); c.closePath(); c.fill(); c.stroke();
+    for (const [x, y, r] of [[5, 2, 1.8], [6.5, -3, 1.1], [1, 4, 1.2]]) kreis(c, x, y, r, "#e0a91f");
+  } },
+  cevapi: { name: "Ćevapi", draw: c => {
+    for (const y of [-4.5, 0, 4.5]) {
+      c.fillStyle = "#8a4b25"; c.strokeStyle = "#5e2f14"; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(0, y, 8.5, 2.2, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+  } },
+  krone: { name: "Kronen", draw: c => {
+    c.fillStyle = "#f4c430"; c.strokeStyle = "#a67c00"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-8, 6); c.lineTo(-8, -4); c.lineTo(-4, 0); c.lineTo(0, -7); c.lineTo(4, 0); c.lineTo(8, -4); c.lineTo(8, 6);
+    c.closePath(); c.fill(); c.stroke();
+    kreis(c, 0, 2, 1.7, "#c8102e");
+  } },
+  brezel: { name: "Brezeln", draw: c => {
+    c.strokeStyle = "#a0561f"; c.lineWidth = 3; c.lineCap = "round";
+    c.beginPath(); c.arc(-3.5, -1, 4.5, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.arc(3.5, -1, 4.5, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.moveTo(-6, 7); c.quadraticCurveTo(0, 0, 6, 7); c.stroke();
+    for (const [x, y] of [[-5, -4], [4, -5], [-2, 3], [6, 1]]) kreis(c, x, y, 0.8, "#ffffff");
+  } },
+  mozartkugel: { name: "Mozartkugeln", draw: c => {
+    kugel(c, 0, 0, 7.5, "#c0c6cf", "#7d8794");
+    kreis(c, 0, 0, 4, "#c8102e");
+    kreis(c, 0, 0, 2.2, "#e8d9b0");
+    kreis(c, -3.5, -3.5, 1.5, "rgba(255, 255, 255, 0.85)");
+  } },
+  pizza: { name: "Pizzas", draw: c => {
+    c.fillStyle = "#f6c453"; c.strokeStyle = "#c98b3c"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(0, 9); c.lineTo(-8, -6); c.quadraticCurveTo(0, -10, 8, -6); c.closePath(); c.fill(); c.stroke();
+    c.lineWidth = 3; c.beginPath(); c.moveTo(-8, -6); c.quadraticCurveTo(0, -10, 8, -6); c.stroke();
+    for (const [x, y, r] of [[-2, -2, 1.8], [2.5, 0.5, 1.6], [0, 4.5, 1.3]]) kreis(c, x, y, r, "#c0392b");
+  } },
+  croissant: { name: "Croissants", draw: c => {
+    for (const i of [-2, 2, -1, 1, 0]) {
+      c.fillStyle = "#d99a42"; c.strokeStyle = "#a0661f"; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(i * 3.4, Math.abs(i) * 1.8 - 1, 2.6, 4.6 - Math.abs(i) * 0.9, i * 0.35, 0, Math.PI * 2);
+      c.fill(); c.stroke();
+    }
+  } },
+  krawatte: { name: "Krawatten", draw: c => {
+    c.fillStyle = "#c8102e"; c.strokeStyle = "#7a0a1c"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-2.5, -8); c.lineTo(2.5, -8); c.lineTo(1.8, -4.5); c.lineTo(-1.8, -4.5); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-1.8, -4.5); c.lineTo(1.8, -4.5); c.lineTo(4, 5); c.lineTo(0, 9); c.lineTo(-4, 5); c.closePath(); c.fill(); c.stroke();
+    for (const [x, y] of [[0, -1], [-1.5, 3], [1.5, 3], [0, 6]]) kreis(c, x, y, 0.8, "#ffffff");
+  } },
+  tennisball: { name: "Tennisbälle", draw: c => {
+    kugel(c, 0, 0, 7.5, "#d4e83a", "#9fb21f");
+    c.strokeStyle = "#ffffff"; c.lineWidth = 1.4;
+    c.beginPath(); c.arc(-10, 0, 7, -0.8, 0.8); c.stroke();
+    c.beginPath(); c.arc(10, 0, 7, Math.PI - 0.8, Math.PI + 0.8); c.stroke();
+  } },
+  honig: { name: "Honigtöpfe", draw: c => {
+    c.fillStyle = "#c98b3c"; c.strokeStyle = "#8a5a20"; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(0, 2, 7.5, 6.5, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = "#8a5a20"; c.fillRect(-6, -6, 12, 3);
+    c.fillStyle = "#fff3d1"; c.fillRect(-4, 1, 8, 4);
+    c.fillStyle = "#ffb703"; c.beginPath(); c.ellipse(-3, -2, 1.8, 3.2, 0, 0, Math.PI * 2); c.fill();
+  } },
+  sonnenblume: { name: "Sonnenblumen", draw: c => {
+    c.fillStyle = "#ffd21f";
+    for (let i = 0; i < 10; i++) {
+      const a = i * Math.PI / 5;
+      c.beginPath(); c.ellipse(Math.cos(a) * 5.5, Math.sin(a) * 5.5, 3.2, 1.7, a, 0, Math.PI * 2); c.fill();
+    }
+    kreis(c, 0, 0, 3.8, "#6b3e1e");
+  } },
+  koettbullar: { name: "Köttbullar", draw: c => {
+    for (const [x, y] of [[-3.8, 2.5], [3.8, 2.5], [0, -3.5]]) kugel(c, x, y, 3.8, "#8a4b25", "#5e2f14");
+    kreis(c, 5.5, -4.5, 1.6, "#c8102e");
+  } },
+  wikingerhelm: { name: "Wikingerhelme", draw: c => {
+    c.fillStyle = "#f1e6c8"; c.strokeStyle = "#b8a47a"; c.lineWidth = 1;
+    for (const s of [-1, 1]) {
+      c.beginPath(); c.moveTo(s * 5, -1); c.quadraticCurveTo(s * 12, -3, s * 10, -11); c.quadraticCurveTo(s * 9, -4, s * 3, -4);
+      c.closePath(); c.fill(); c.stroke();
+    }
+    c.fillStyle = "#9aa4b2"; c.strokeStyle = "#5b6878";
+    c.beginPath(); c.arc(0, 4, 7, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#6b7684"; c.fillRect(-7, 3, 14, 3);
+  } },
+  handy: { name: "Handys", draw: c => {
+    c.fillStyle = "#2b3440"; c.fillRect(-4.5, -9, 9, 18);
+    c.fillStyle = "#9fd3a8"; c.fillRect(-3, -7, 6, 6);
+    c.fillStyle = "#c9d5e1";
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) c.fillRect(-3 + k * 2.3, 1 + r * 2.3, 1.4, 1.4);
+  } },
+  baustein: { name: "Bausteine", draw: c => {
+    c.fillStyle = "#d7261e"; c.strokeStyle = "#8f1813"; c.lineWidth = 1;
+    for (const x of [-5, 0, 5]) { c.fillRect(x - 2, -6, 4, 3); c.strokeRect(x - 2, -6, 4, 3); }
+    c.fillRect(-8, -3, 16, 9); c.strokeRect(-8, -3, 16, 9);
+  } },
+  sushi: { name: "Sushis", draw: c => {
+    c.fillStyle = "#ffffff"; c.strokeStyle = "#cfd8e3"; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(0, 2.5, 8.5, 4.5, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = "#ff8a5c"; c.beginPath(); c.ellipse(0, -0.5, 8.5, 3.8, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = "#ffd2bf";
+    for (const x of [-5, 4]) { c.beginPath(); c.moveTo(x - 1.5, -3); c.lineTo(x + 1.5, 2); c.stroke(); }
+    c.fillStyle = "#1d2b24"; c.fillRect(-1.6, -4.5, 3.2, 11);
+  } },
+  ahorn: { name: "Ahornblätter", draw: c => {
+    c.strokeStyle = "#8f1813"; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(0, 3); c.lineTo(0, 9); c.stroke();
+    stern(c, 0, -1, 8.5, "#d52b1e", "#8f1813");
+  } },
+  fussball: { name: "Fussbälle", draw: c => {
+    kugel(c, 0, 0, 7.5, "#ffffff", "#14233a");
+    c.fillStyle = "#14233a";
+    c.beginPath();
+    for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; c.lineTo(Math.cos(a) * 3, Math.sin(a) * 3); }
+    c.closePath(); c.fill();
+    for (let i = 0; i < 5; i++) { const a = Math.PI / 2 + i * Math.PI * 2 / 5; kreis(c, Math.cos(a) * 6, Math.sin(a) * 6, 1.4, "#14233a"); }
+  } },
+  diamant: { name: "Diamanten", draw: c => {
+    const g = c.createLinearGradient(-7, -7, 7, 8);
+    g.addColorStop(0, "#ff9de2"); g.addColorStop(0.5, "#7fdcff"); g.addColorStop(1, "#b18cff");
+    c.fillStyle = g; c.strokeStyle = "#4b5fa8"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-8, -2); c.lineTo(-4, -7); c.lineTo(4, -7); c.lineTo(8, -2); c.lineTo(0, 9); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-8, -2); c.lineTo(8, -2); c.moveTo(-4, -7); c.lineTo(-2, -2); c.lineTo(0, 9); c.lineTo(2, -2); c.lineTo(4, -7); c.stroke();
+  } },
+  goldbarren: { name: "Goldbarren", draw: c => {
+    c.fillStyle = "#f4c430"; c.strokeStyle = "#a67c00"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-9, 5); c.lineTo(9, 5); c.lineTo(6, -3); c.lineTo(-6, -3); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = "#ffe680";
+    c.beginPath(); c.moveTo(-6, -3); c.lineTo(6, -3); c.lineTo(4.5, -6); c.lineTo(-4.5, -6); c.closePath(); c.fill(); c.stroke();
+  } },
+  fleisch: { name: "Fleischkeulen", draw: c => {
+    c.strokeStyle = "#f3eee4"; c.lineWidth = 3; c.lineCap = "round";
+    c.beginPath(); c.moveTo(2, 2); c.lineTo(7, 7); c.stroke();
+    kreis(c, 8.5, 6, 1.8, "#f3eee4"); kreis(c, 6, 8.5, 1.8, "#f3eee4");
+    c.fillStyle = "#b5452d"; c.strokeStyle = "#7a2a19"; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(-2, -2, 6.5, 5.5, -0.6, 0, Math.PI * 2); c.fill(); c.stroke();
+  } },
+  fisch: { name: "Fische", draw: c => {
+    c.fillStyle = "#7fb3d5"; c.strokeStyle = "#3f6f91"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(4, 0); c.lineTo(9, -4.5); c.lineTo(9, 4.5); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(-1.5, 0, 6.5, 4, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    kreis(c, -5, -1, 1, "#14233a");
+  } },
+  karotte: { name: "Karotten", draw: c => {
+    c.strokeStyle = "#2f8f3a"; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(0, -6); c.lineTo(-3, -10); c.moveTo(0, -6); c.lineTo(0, -11); c.moveTo(0, -6); c.lineTo(3, -10); c.stroke();
+    c.fillStyle = "#f08a24"; c.strokeStyle = "#b85e10"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-3.5, -6); c.lineTo(3.5, -6); c.lineTo(0, 9); c.closePath(); c.fill(); c.stroke();
+  } },
+  mond: { name: "Monde", draw: c => {
+    c.fillStyle = "#ffe680"; c.strokeStyle = "#c9a227"; c.lineWidth = 1;
+    c.beginPath(); c.arc(0, 0, 8, Math.PI * 0.3, Math.PI * 1.7); c.arc(4, 0, 6.5, Math.PI * 1.6, Math.PI * 0.4, true);
+    c.closePath(); c.fill(); c.stroke();
+  } }
+};
+
+// ===== Skins: Jacken, Helme, Ski und was sie einsammeln =====
+const SKINS = [
+  // --- Flaggen ---
+  { id: "schweiz", name: "Schweiz", gruppe: "Flaggen", helm: "#1f6fd1", item: ITEMS.kaese,
+    jacke: c => { flaeche(c, "#d7261e"); c.fillStyle = "#fff"; c.fillRect(-1.5, -0.5, 3, 9); c.fillRect(-4.5, 2.5, 9, 3); } },
+  { id: "jugoslawien", name: "Jugoslawien", gruppe: "Flaggen", helm: "#0c3c8c", item: ITEMS.cevapi,
+    jacke: c => { streifenQuer(c, ["#0c3c8c", "#ffffff", "#d7261e"]); stern(c, 0, 4, 5, "#d7261e", "#f4c430"); } },
+  { id: "liechtenstein", name: "Liechtenstein", gruppe: "Flaggen", helm: "#002b7f", item: ITEMS.krone,
+    jacke: c => { streifenQuer(c, ["#002b7f", "#ce1126"]); c.fillStyle = "#ffd83d"; c.fillRect(-6, -2, 4, 2.5); } },
+  { id: "deutschland", name: "Deutschland", gruppe: "Flaggen", helm: "#222222", item: ITEMS.brezel,
+    jacke: c => streifenQuer(c, ["#111111", "#dd0000", "#ffce00"]) },
+  { id: "oesterreich", name: "Österreich", gruppe: "Flaggen", helm: "#ffffff", item: ITEMS.mozartkugel,
+    jacke: c => streifenQuer(c, ["#c8102e", "#ffffff", "#c8102e"]) },
+  { id: "italien", name: "Italien", gruppe: "Flaggen", helm: "#009246", item: ITEMS.pizza,
+    jacke: c => streifenLaengs(c, ["#009246", "#ffffff", "#ce2b37"]) },
+  { id: "frankreich", name: "Frankreich", gruppe: "Flaggen", helm: "#0055a4", item: ITEMS.croissant,
+    jacke: c => streifenLaengs(c, ["#0055a4", "#ffffff", "#ef4135"]) },
+  { id: "kroatien", name: "Kroatien", gruppe: "Flaggen", helm: "#171796", item: ITEMS.krawatte,
+    jacke: c => {
+      streifenQuer(c, ["#ff0000", "#ffffff", "#171796"]);
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+        c.fillStyle = (i + j) % 2 ? "#ffffff" : "#ff0000";
+        c.fillRect(-3 + i * 2, 1 + j * 2, 2, 2);
+      }
+    } },
+  { id: "serbien", name: "Serbien", gruppe: "Flaggen", helm: "#c6363c", item: ITEMS.tennisball,
+    jacke: c => streifenQuer(c, ["#c6363c", "#0c4076", "#ffffff"]) },
+  { id: "slowenien", name: "Slowenien", gruppe: "Flaggen", helm: "#005ce5", item: ITEMS.honig,
+    jacke: c => streifenQuer(c, ["#ffffff", "#005ce5", "#ed1c24"]) },
+  { id: "ukraine", name: "Ukraine", gruppe: "Flaggen", helm: "#0057b7", item: ITEMS.sonnenblume,
+    jacke: c => streifenQuer(c, ["#0057b7", "#ffd700"]) },
+  { id: "schweden", name: "Schweden", gruppe: "Flaggen", helm: "#fecc02", item: ITEMS.koettbullar,
+    jacke: c => { flaeche(c, "#006aa7"); kreuz(c, "#fecc02", 3.5); } },
+  { id: "norwegen", name: "Norwegen", gruppe: "Flaggen", helm: "#ba0c2f", item: ITEMS.wikingerhelm,
+    jacke: c => { flaeche(c, "#ba0c2f"); kreuz(c, "#ffffff", 5); kreuz(c, "#00205b", 2.5); } },
+  { id: "finnland", name: "Finnland", gruppe: "Flaggen", helm: "#ffffff", item: ITEMS.handy,
+    jacke: c => { flaeche(c, "#ffffff"); kreuz(c, "#002f6c", 4); } },
+  { id: "daenemark", name: "Dänemark", gruppe: "Flaggen", helm: "#c8102e", item: ITEMS.baustein,
+    jacke: c => { flaeche(c, "#c8102e"); kreuz(c, "#ffffff", 3.5); } },
+  { id: "japan", name: "Japan", gruppe: "Flaggen", helm: "#ffffff", item: ITEMS.sushi,
+    jacke: c => { flaeche(c, "#ffffff"); kreis(c, 0, 4, 4.2, "#bc002d"); } },
+  { id: "kanada", name: "Kanada", gruppe: "Flaggen", helm: "#d52b1e", item: ITEMS.ahorn,
+    jacke: c => { streifenLaengs(c, ["#d52b1e", "#ffffff", "#ffffff", "#d52b1e"]); stern(c, 0, 4, 3.5, "#d52b1e"); } },
+  { id: "brasilien", name: "Brasilien", gruppe: "Flaggen", helm: "#009c3b", item: ITEMS.fussball,
+    jacke: c => {
+      flaeche(c, "#009c3b");
+      c.fillStyle = "#ffdf00";
+      c.beginPath(); c.moveTo(0, -4); c.lineTo(7, 4); c.lineTo(0, 12); c.lineTo(-7, 4); c.closePath(); c.fill();
+      kreis(c, 0, 4, 3.5, "#002776");
+    } },
+
+  // --- Spezial ---
+  { id: "regenbogen", name: "Regenbogen", gruppe: "Spezial", helm: "#ffffff", item: ITEMS.diamant,
+    jacke: c => streifenQuer(c, ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787"]) },
+  { id: "gold", name: "Goldmedaille", gruppe: "Spezial", helm: "#d4af37", ski: "#8a6a12", item: ITEMS.goldbarren,
+    jacke: c => {
+      const g = c.createLinearGradient(-8, -6, 8, 14);
+      g.addColorStop(0, "#8a6a12"); g.addColorStop(0.5, "#f7dc74"); g.addColorStop(1, "#b8901f");
+      flaeche(c, g);
+    } },
+  { id: "tiger", name: "Tiger", gruppe: "Spezial", helm: "#f08a24", item: ITEMS.fleisch,
+    jacke: c => {
+      flaeche(c, "#f08a24");
+      c.strokeStyle = "#111111"; c.lineWidth = 1.8;
+      for (let x = -18; x < 12; x += 5) { c.beginPath(); c.moveTo(x, -6); c.lineTo(x + 7, 14); c.stroke(); }
+    } },
+  { id: "pinguin", name: "Pinguin", gruppe: "Spezial", helm: "#111111", ski: "#f08a24", item: ITEMS.fisch,
+    jacke: c => { flaeche(c, "#111111"); c.fillStyle = "#ffffff"; c.beginPath(); c.ellipse(0, 6, 4.5, 7, 0, 0, Math.PI * 2); c.fill(); } },
+  { id: "schneemann", name: "Schneemann", gruppe: "Spezial", helm: "#111111", ski: "#6b4a2f", item: ITEMS.karotte,
+    jacke: c => { flaeche(c, "#ffffff"); for (const y of [0, 4, 8]) kreis(c, 0, y, 1.2, "#111111"); } },
+  { id: "nacht", name: "Sternennacht", gruppe: "Spezial", helm: "#1b2a4e", item: ITEMS.mond,
+    jacke: c => {
+      flaeche(c, "#1b2a4e");
+      for (const [x, y] of [[-5, -2], [4, 0], [-2, 9], [5, 10], [-6, 6]]) kreis(c, x, y, 0.7, "#ffe680");
+      stern(c, 1, 4, 3, "#ffe680");
+    } }
+];
+
+// ===== Itemshop =====
+const SELTENHEIT = {
+  gewoehnlich: "Gewöhnlich",
+  selten: "Selten",
+  episch: "Episch",
+  legendaer: "Legendär"
+};
+// art: spur (nur eine aktiv), zubehoer (beliebig kombinierbar), power (an/aus), verbrauch (wird aufgebraucht)
+const SHOP = [
+  { id: "glitzer",    name: "Glitzerspur",       art: "spur",      preis: 30,  seltenheit: "selten",
+    text: "Funkelnde Sterne hinter deinen Ski." },
+  { id: "regenbogen", name: "Regenbogenspur",    art: "spur",      preis: 80,  seltenheit: "episch",
+    text: "Du malst einen Regenbogen in den Schnee." },
+  { id: "feuer",      name: "Feuerspur",         art: "spur",      preis: 200, seltenheit: "legendaer",
+    text: "So schnell, dass der Schnee brennt." },
+  { id: "krone",      name: "Goldkrone",         art: "zubehoer",  preis: 40,  seltenheit: "selten",
+    text: "Für Pistenkönige und Pistenköniginnen." },
+  { id: "umhang",     name: "Superhelden­umhang", art: "zubehoer",  preis: 100, seltenheit: "episch",
+    text: "Flattert im Fahrtwind." },
+  { id: "fluegel",    name: "Engelsflügel",      art: "zubehoer",  preis: 250, seltenheit: "legendaer",
+    text: "Schlagen, während du den Berg hinunterfliegst." },
+  { id: "schild",     name: "Schutzschild",      art: "verbrauch", preis: 25,  seltenheit: "gewoehnlich",
+    text: "Rettet dich einmal vor einem Crash." },
+  { id: "magnet",     name: "Supermagnet",       art: "power",     preis: 120, seltenheit: "episch",
+    text: "Zieht alles in deiner Nähe zu dir." }
+];
+
+// ===== Spielstand (bleibt im Browser gespeichert) =====
+const SAVE_KEY = "pistenflitzer-spielstand";
+function loadSave() {
+  const leer = { coins: 0, owned: [], trail: null, acc: [], magnet: false, shields: 0 };
+  try { return Object.assign(leer, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch (e) { return leer; }
+}
+function storeSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+}
+const save = loadSave();
+
+function loadSkin() {
+  try { return localStorage.getItem("pistenflitzer-skin") || "schweiz"; } catch (e) { return "schweiz"; }
+}
+let skinId = loadSkin();
+const currentSkin = () => SKINS.find(s => s.id === skinId) || SKINS[0];
+
+// ===== Skifahrer zeichnen =====
+function drawUmhang(c, t) {
+  const w1 = Math.sin(t * 9) * 2.5, w2 = Math.sin(t * 9 + 1.3) * 2.5;
+  c.fillStyle = "#c8102e"; c.strokeStyle = "#f4c430"; c.lineWidth = 1.2;
+  c.beginPath();
+  c.moveTo(-7, -4);
+  c.quadraticCurveTo(-11, -16, -12 + w1, -29);
+  c.quadraticCurveTo(-4, -25 + w2, 0, -30 + w1);
+  c.quadraticCurveTo(4, -25 + w1, 12 + w2, -29);
+  c.quadraticCurveTo(11, -16, 7, -4);
+  c.closePath(); c.fill(); c.stroke();
+}
+function drawFluegel(c, t) {
+  const schlag = 0.75 + 0.25 * Math.sin(t * 9);
+  for (const s of [-1, 1]) {
+    c.save();
+    c.translate(s * 6, -1);
+    c.scale(s * schlag * 1.25, 1.25);
+    c.fillStyle = "#ffffff"; c.strokeStyle = "#8fa3b8"; c.lineWidth = 1;
+    for (const [x, y, rx, ry, a] of [[9, -5, 10, 4, -0.45], [8, -0.5, 9, 3.4, -0.15], [6, 3.5, 7, 3, 0.15]]) {
+      c.beginPath(); c.ellipse(x, y, rx, ry, a, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+}
+function drawKrone(c) {
+  c.fillStyle = "#f4c430"; c.strokeStyle = "#a67c00"; c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(-6, -10); c.lineTo(-6, -16); c.lineTo(-3, -13); c.lineTo(0, -18); c.lineTo(3, -13); c.lineTo(6, -16); c.lineTo(6, -10);
+  c.closePath(); c.fill(); c.stroke();
+  kreis(c, 0, -12.5, 1.3, "#c8102e");
+}
+function drawBubble(c, x, y, puls) {
+  c.fillStyle = `rgba(76, 195, 255, ${0.1 + 0.08 * puls})`;
+  c.strokeStyle = "rgba(31, 140, 210, 0.8)";
+  c.lineWidth = 2;
+  c.beginPath(); c.arc(x, y, 25, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.strokeStyle = "rgba(255, 255, 255, 0.9)";
+  c.beginPath(); c.arc(x, y, 20, Math.PI * 1.1, Math.PI * 1.45); c.stroke();
+}
+
+// Zeichnet den Skifahrer mit Skin und Zubehör; (0, 0) ist die Körpermitte
+function drawFigur(c, skin, extras = {}, t = 0) {
+  const acc = extras.acc || [];
+  if (acc.includes("fluegel")) drawFluegel(c, t);
+  if (acc.includes("umhang")) drawUmhang(c, t);
+  // Ski
+  c.strokeStyle = skin.ski || "#14233a";
+  c.lineWidth = 3;
+  c.lineCap = "round";
+  for (const sx of [-4, 4]) { c.beginPath(); c.moveTo(sx, -2); c.lineTo(sx, 22); c.stroke(); }
+  // Stöcke
+  c.strokeStyle = "#5b6878";
+  c.lineWidth = 1.5;
+  c.beginPath(); c.moveTo(-8, 2); c.lineTo(-12, -12); c.moveTo(8, 2); c.lineTo(12, -12); c.stroke();
+  // Jacke mit Muster
+  c.save();
+  c.beginPath(); c.ellipse(0, 4, 8, 10, 0, 0, Math.PI * 2); c.clip();
+  skin.jacke(c);
+  c.restore();
+  c.strokeStyle = "rgba(20, 35, 58, 0.35)";
+  c.lineWidth = 1;
+  c.beginPath(); c.ellipse(0, 4, 8, 10, 0, 0, Math.PI * 2); c.stroke();
+  // Kopf mit Helm
+  c.fillStyle = skin.helm;
+  c.beginPath(); c.arc(0, -9, 6, 0, Math.PI * 2); c.fill(); c.stroke();
+  if (acc.includes("krone")) drawKrone(c);
+}
+
+function drawItem(c, skin, x, y, s, glow, t = 0) {
+  c.save();
+  c.translate(x, y);
+  if (glow) kreis(c, 0, 0, 14 + Math.sin(t * 6) * 1.5, "rgba(255, 210, 60, 0.30)");
+  c.scale(s, s);
+  skin.item.draw(c);
+  c.restore();
+}
+
+function paintIcon(cv, skin, size) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = size * dpr;
+  cv.height = size * dpr;
+  cv.style.width = size + "px";
+  cv.style.height = size + "px";
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, size, size);
+  c.translate(size / 2, size / 2);
+  c.scale(size / 22, size / 22);
+  skin.item.draw(c);
+}
+
+// ===== Grundgerüst =====
+const canvas = document.getElementById("piste");
+const ctx = canvas.getContext("2d");
+const $ = id => document.getElementById(id);
+const ui = {
+  meters: $("meters"), kmh: $("kmh"), best: $("best"),
+  pisteName: document.querySelector("#piste-name b"), pisteColor: $("piste-color"),
+  coins: $("coins"), walletIcon: $("wallet-icon"), shieldHud: $("shield-hud"), shieldCount: $("shield-count"),
+  start: $("start"), over: $("over"), shop: $("shop"), laden: $("laden"),
+  crashText: $("crash-text"), result: $("result"), lootText: $("loot-text"), recordText: $("record-text"),
+  purseIcon: $("purse-icon"), purseCount: $("purse-count"), purseName: $("purse-name")
+};
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let W = 0, H = 0;
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = r.width;
+  H = r.height;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resize);
+resize();
+
+function loadBest() {
+  try { return Number(localStorage.getItem("pistenflitzer-rekord")) || 0; } catch (e) { return 0; }
+}
+function saveBest(m) {
+  try { localStorage.setItem("pistenflitzer-rekord", String(m)); } catch (e) {}
+}
+
+const state = {
+  mode: "start",   // start, fahren, crash
+  x: 0, vx: 0, speed: 0, dist: 0, t: 0,
+  obstacles: [], items: [], particles: [], popups: [], trail: [],
+  spawnBudget: 0, itemBudget: 0, runCoins: 0, invuln: 0,
+  best: loadBest(), crashTime: 0
+};
+const keys = { left: false, right: false };
+const skierY = () => H * 0.28;
+const meters = () => Math.floor(state.dist / 20);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function currentPiste() {
+  let p = PISTEN[0];
+  for (const stufe of PISTEN) if (meters() >= stufe.ab) p = stufe;
+  return p;
+}
+
+// ===== Hindernisse und Sammel-Items =====
+function randomType() {
+  const r = Math.random();
+  if (r < 0.6) return "tanne";
+  if (r < 0.85) return "stein";
+  return "schneemann";
+}
+function spawn(y) {
+  const o = { x: 20 + Math.random() * (W - 40), y, type: randomType(), size: 0.85 + Math.random() * 0.4 };
+  state.obstacles.push(o);
+  // Items, die im Hindernis stecken würden, verschwinden
+  state.items = state.items.filter(it => Math.hypot(it.x - o.x, it.y - o.y) > 34);
+  return o;
+}
+function spawnItems(y) {
+  const x = 30 + Math.random() * (W - 60);
+  const anzahl = Math.random() < 0.35 ? 4 : 1; // manchmal eine ganze Reihe
+  for (let i = 0; i < anzahl; i++) {
+    const it = { x, y: y + i * 34 };
+    const frei = state.obstacles.every(o => Math.hypot(o.x - it.x, o.y - it.y) > 34);
+    if (frei) state.items.push(it);
+  }
+}
+
+function reset() {
+  state.x = W / 2;
+  state.vx = 0;
+  state.speed = EINSTELLUNGEN.startTempo;
+  state.dist = 0;
+  state.trail = [];
+  state.obstacles = [];
+  state.items = [];
+  state.particles = [];
+  state.popups = [];
+  state.spawnBudget = 0;
+  state.itemBudget = 0;
+  state.runCoins = 0;
+  state.invuln = 0;
+  // ein paar Bäume, damit die Piste von Anfang an nach Piste aussieht
+  // (nicht in der Mitte, sonst kracht man gleich am Anfang hinein)
+  for (let y = skierY() + 160; y < H + 40; y += 70) {
+    const o = spawn(y);
+    if (Math.abs(o.x - W / 2) < 60) o.x += o.x < W / 2 ? -60 : 60;
+  }
+}
+
+function startGame() {
+  reset();
+  state.mode = "fahren";
+  ui.start.hidden = true;
+  ui.over.hidden = true;
+}
+
+function crash(type) {
+  state.mode = "crash";
+  state.crashTime = performance.now();
+  storeSave();
+  const m = meters();
+  const neuerRekord = m > state.best;
+  if (neuerRekord) { state.best = m; saveBest(m); }
+  const texte = {
+    tanne: "Autsch! Direkt in eine Tanne.",
+    stein: "Rumms! Den Stein übersehen.",
+    schneemann: "Oh nein, der arme Schneemann!"
+  };
+  ui.crashText.textContent = texte[type];
+  ui.result.textContent = m + " m";
+  ui.lootText.textContent = "+" + state.runCoins + " " + currentSkin().item.name + " eingesammelt";
+  ui.recordText.textContent = neuerRekord ? "Neuer Rekord!" : "Rekord: " + state.best + " m";
+  setTimeout(() => { ui.over.hidden = false; $("again-btn").focus(); }, 700);
+}
+
+function burst(x, y, farben, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120;
+    state.particles.push({ art: "funke", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5, max: 0.5, farbe: pick(farben), size: 2 + Math.random() * 2 });
+  }
+}
+
+function collect(it) {
+  save.coins++;
+  state.runCoins++;
+  storeSave();
+  state.popups.push({ x: it.x, y: it.y, life: 0.7 });
+  burst(it.x, it.y, ["#ffd84d", "#ffffff", "#ffb703"], 6);
+}
+
+function spawnTrailParticles() {
+  const fx = state.x, fy = skierY() + 14;
+  if (save.trail === "glitzer" && Math.random() < 0.7) {
+    state.particles.push({ art: "glitzer", x: fx + (Math.random() - 0.5) * 14, y: fy, vx: 0, vy: 0, life: 0.9, max: 0.9,
+      farbe: pick(["#ffd84d", "#ffffff", "#7fdcff", "#ff9de2"]), size: 2.5 + Math.random() * 2 });
+  }
+  if (save.trail === "feuer") {
+    for (let i = 0; i < 3; i++) {
+      state.particles.push({ art: "feuer", x: fx + (Math.random() - 0.5) * 10, y: fy, vx: (Math.random() - 0.5) * 40, vy: -30 - Math.random() * 40,
+        life: 0.45, max: 0.45, size: 4 + Math.random() * 3 });
+    }
+  }
+}
+
+// Trefferzone pro Hindernis: Mittelpunkt (Abstand nach oben) und Radius
+const HITBOX = { tanne: [10, 11], stein: [6, 12], schneemann: [12, 12] };
+
+function update(dt) {
+  const dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+  state.vx += (dir * EINSTELLUNGEN.lenkTempo - state.vx) * Math.min(1, dt * 10);
+  state.x = clamp(state.x + state.vx * dt, 14, W - 14);
+  state.speed = Math.min(EINSTELLUNGEN.maxTempo, state.speed + EINSTELLUNGEN.beschleunigung * dt);
+  if (state.invuln > 0) state.invuln -= dt;
+
+  const dy = state.speed * dt;
+  state.dist += dy;
+
+  for (const o of state.obstacles) o.y -= dy;
+  state.obstacles = state.obstacles.filter(o => o.y > -60);
+
+  // Je weiter unten, desto mehr Hindernisse
+  state.spawnBudget += dy * EINSTELLUNGEN.hindernisDichte * (1 + state.dist / 30000) * (W / 400);
+  while (state.spawnBudget >= 1) { spawn(H + 40 + Math.random() * 40); state.spawnBudget -= 1; }
+
+  // Sammel-Items
+  state.itemBudget += dy * EINSTELLUNGEN.itemDichte * (W / 400);
+  while (state.itemBudget >= 1) { spawnItems(H + 40); state.itemBudget -= 1; }
+  const sy = skierY() + 4;
+  for (const it of state.items) {
+    it.y -= dy;
+    const ddx = state.x - it.x, ddy = sy - it.y;
+    const d = Math.hypot(ddx, ddy);
+    if (save.magnet && d < EINSTELLUNGEN.magnetRadius && d > 0) {
+      const zug = Math.min(d, 520 * dt);
+      it.x += ddx / d * zug;
+      it.y += ddy / d * zug;
+    }
+    if (d < 22) { it.weg = true; collect(it); }
+  }
+  state.items = state.items.filter(it => !it.weg && it.y > -30);
+
+  // Spur und Partikel
+  for (const p of state.trail) p.y -= dy;
+  state.trail.push({ x: state.x, y: skierY() });
+  state.trail = state.trail.filter(p => p.y > -20);
+  spawnTrailParticles();
+  for (const p of state.particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt - dy; }
+  state.particles = state.particles.filter(p => p.life > 0);
+  for (const p of state.popups) { p.life -= dt; p.y -= 50 * dt; }
+  state.popups = state.popups.filter(p => p.life > 0);
+
+  // Zusammenstösse
+  for (const o of state.obstacles) {
+    const [up, r] = HITBOX[o.type];
+    const ddx = o.x - state.x;
+    const ddy = (o.y - up * o.size) - (skierY() + 6);
+    const rr = r * o.size + 8;
+    if (ddx * ddx + ddy * ddy >= rr * rr || state.invuln > 0) continue;
+    if (save.shields > 0) {
+      // Schutzschild fängt den Crash ab
+      save.shields--;
+      storeSave();
+      o.weg = true;
+      state.invuln = 1.2;
+      burst(o.x, o.y - 10, ["#4cc3ff", "#ffffff", "#1f6fd1"], 16);
+      continue;
+    }
+    crash(o.type);
+    break;
+  }
+  state.obstacles = state.obstacles.filter(o => !o.weg);
+}
+
+// ===== Schneeflocken (nur Deko) =====
+const flakes = Array.from({ length: reduceMotion ? 0 : 70 }, () => ({
+  x: Math.random(), y: Math.random(), r: 1 + Math.random() * 2, s: 0.03 + Math.random() * 0.05
+}));
+function updateFlakes(dt) {
+  for (const f of flakes) {
+    f.y += f.s * dt;
+    f.x += Math.sin((f.y + f.r) * 12) * 0.0006;
+    if (f.y > 1) { f.y = 0; f.x = Math.random(); }
+  }
+}
+
+// ===== Zeichnen =====
+const REGENBOGEN = ["#e40303", "#ff8c00", "#ffed00", "#008026", "#004dff", "#750787"];
+
+function drawBackground() {
+  ctx.fillStyle = "#f2f6fa";
+  ctx.fillRect(0, 0, W, H);
+  // Rillen der Pistenmaschine
+  ctx.strokeStyle = "rgba(160, 185, 210, 0.22)";
+  ctx.lineWidth = 2;
+  const gap = 26;
+  const off = state.dist % gap;
+  for (let y = -off; y < H; y += gap) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Pistenmarkierungen am Rand in der Farbe der Piste
+  const farbe = currentPiste().farbe;
+  const poleGap = 180;
+  const poleOff = state.dist % poleGap;
+  for (let y = -poleOff; y < H + poleGap; y += poleGap) {
+    for (const x of [10, W - 10]) {
+      ctx.fillStyle = "rgba(20, 35, 58, 0.15)";
+      ctx.beginPath(); ctx.ellipse(x + 3, y + 2, 5, 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#c9d5e1";
+      ctx.fillRect(x - 1.5, y - 34, 3, 34);
+      ctx.fillStyle = farbe;
+      ctx.fillRect(x - 2.5, y - 34, 5, 12);
+    }
+  }
+}
+
+function strokeTrail(c, punkte, offset) {
+  c.beginPath();
+  punkte.forEach(([x, y], i) => (i ? c.lineTo(x + offset, y) : c.moveTo(x + offset, y)));
+  c.stroke();
+}
+
+function drawTrail() {
+  if (state.trail.length < 2) return;
+  const punkte = state.trail.map(p => [p.x, p.y + 14]);
+  if (save.trail === "regenbogen") {
+    ctx.lineWidth = 3;
+    REGENBOGEN.forEach((f, i) => { ctx.strokeStyle = f; strokeTrail(ctx, punkte, -7.5 + i * 3); });
+    return;
+  }
+  ctx.strokeStyle = "rgba(140, 165, 195, 0.55)";
+  ctx.lineWidth = 2;
+  for (const side of [-4, 4]) strokeTrail(ctx, punkte, side);
+}
+
+function drawParticles() {
+  for (const p of state.particles) {
+    const a = p.life / p.max;
+    ctx.globalAlpha = a;
+    if (p.art === "glitzer") {
+      stern(ctx, p.x, p.y, p.size * (0.6 + 0.4 * Math.sin(state.t * 20 + p.x)), p.farbe, "rgba(20, 35, 58, 0.25)");
+    } else if (p.art === "feuer") {
+      kreis(ctx, p.x, p.y, p.size * (0.4 + a * 0.6), a > 0.66 ? "#ffe14d" : a > 0.33 ? "#ff9f1c" : "#e63a1e");
+    } else {
+      kreis(ctx, p.x, p.y, p.size, p.farbe);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawShadow(x, y, w) {
+  ctx.fillStyle = "rgba(20, 35, 58, 0.13)";
+  ctx.beginPath(); ctx.ellipse(x + 4, y, w, w * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawTanne(o) {
+  const s = o.size;
+  ctx.save(); ctx.translate(o.x, o.y); ctx.scale(s, s);
+  drawShadow(0, 0, 16);
+  ctx.fillStyle = "#6b4a2f";
+  ctx.fillRect(-3, -8, 6, 8);
+  const layers = [[-8, 18, 20], [-20, 14, 18], [-31, 10, 16]];
+  for (const [y, w, h] of layers) {
+    ctx.fillStyle = "#1e5844";
+    ctx.beginPath(); ctx.moveTo(0, y - h); ctx.lineTo(w, y); ctx.lineTo(-w, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.moveTo(0, y - h); ctx.lineTo(w * 0.35, y - h * 0.62); ctx.lineTo(-w * 0.35, y - h * 0.62); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawStein(o) {
+  const s = o.size;
+  ctx.save(); ctx.translate(o.x, o.y); ctx.scale(s, s);
+  drawShadow(0, 0, 15);
+  ctx.fillStyle = "#7d8794";
+  ctx.beginPath();
+  ctx.moveTo(-14, 0); ctx.lineTo(-11, -10); ctx.lineTo(-2, -16); ctx.lineTo(9, -13); ctx.lineTo(14, -3); ctx.lineTo(12, 0);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(-2, -16); ctx.lineTo(9, -13); ctx.lineTo(3, -11); ctx.lineTo(-4, -12); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawSchneemann(o) {
+  const s = o.size;
+  ctx.save(); ctx.translate(o.x, o.y); ctx.scale(s, s);
+  drawShadow(0, 0, 13);
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#b8c7d6";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, -10, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, -27, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#14233a";
+  ctx.beginPath(); ctx.arc(-3, -29, 1.3, 0, Math.PI * 2); ctx.arc(3, -29, 1.3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#f08a24";
+  ctx.beginPath(); ctx.moveTo(0, -27); ctx.lineTo(9, -25.5); ctx.lineTo(0, -25); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#d7261e";
+  ctx.fillRect(-7, -21, 14, 3);
+  ctx.restore();
+}
+
+function drawSkier() {
+  const crashed = state.mode === "crash";
+  const lean = crashed ? 1.4 : (state.vx / EINSTELLUNGEN.lenkTempo) * 0.45;
+  ctx.save();
+  ctx.translate(state.x, skierY());
+  drawShadow(0, 16, 12);
+  if (save.shields > 0 || state.invuln > 0) drawBubble(ctx, 0, 4, Math.sin(state.t * 4));
+  if (state.invuln > 0 && Math.floor(state.t * 20) % 2) ctx.globalAlpha = 0.4;
+  ctx.rotate(-lean);
+  drawFigur(ctx, currentSkin(), { acc: save.acc }, state.t);
+  ctx.restore();
+}
+
+function drawFlakes() {
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.strokeStyle = "rgba(160, 185, 210, 0.5)";
+  ctx.lineWidth = 0.6;
+  for (const f of flakes) {
+    ctx.beginPath(); ctx.arc(f.x * W, f.y * H, f.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawPopups() {
+  ctx.font = "16px 'Bowlby One', 'Arial Black', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#14233a";
+  for (const p of state.popups) {
+    ctx.globalAlpha = p.life / 0.7;
+    ctx.fillText("+1", p.x, p.y - 14);
+  }
+  ctx.globalAlpha = 1;
+}
+
+const DRAW = { tanne: drawTanne, stein: drawStein, schneemann: drawSchneemann };
+
+function draw() {
+  drawBackground();
+  drawTrail();
+  drawParticles();
+  const skin = currentSkin();
+  for (const it of state.items) drawItem(ctx, skin, it.x, it.y + Math.sin(state.t * 5 + it.x) * 2, 1, true, state.t + it.x);
+  // Hindernisse oberhalb des Skifahrers zuerst, damit die Tiefe stimmt
+  const sorted = [...state.obstacles].sort((a, b) => a.y - b.y);
+  let skierDrawn = false;
+  for (const o of sorted) {
+    if (!skierDrawn && o.y > skierY() + 16) { drawSkier(); skierDrawn = true; }
+    DRAW[o.type](o);
+  }
+  if (!skierDrawn) drawSkier();
+  drawPopups();
+  drawFlakes();
+}
+
+function updateHud() {
+  ui.meters.textContent = meters() + " m";
+  ui.kmh.textContent = Math.round(state.speed / 20 * 3.6) + " km/h";
+  const p = currentPiste();
+  ui.pisteName.textContent = p.name;
+  ui.pisteColor.style.background = p.farbe;
+  ui.best.textContent = state.best + " m";
+  ui.coins.textContent = save.coins;
+  ui.shieldHud.hidden = save.shields === 0;
+  ui.shieldCount.textContent = save.shields;
+}
+
+// ===== Spielschleife =====
+let last = performance.now();
+function frame(t) {
+  const dt = Math.min(0.033, (t - last) / 1000);
+  last = t;
+  state.t += dt;
+  if (state.mode === "fahren") update(dt);
+  updateFlakes(dt);
+  draw();
+  updateHud();
+  requestAnimationFrame(frame);
+}
+
+// ===== Fenster: Ausrüstung und Itemshop =====
+let panelReturn = ui.start;
+let openPanelEl = null;
+
+function openPanel(panel) {
+  panelReturn = ui.over.hidden ? ui.start : ui.over;
+  panelReturn.hidden = true;
+  panel.hidden = false;
+  openPanelEl = panel;
+}
+function closePanel() {
+  if (!openPanelEl) return;
+  openPanelEl.hidden = true;
+  openPanelEl = null;
+  panelReturn.hidden = false;
+  panelReturn.querySelector(".go").focus();
+}
+
+// --- Ausrüstung (Jacken) ---
+const shopList = $("shop-list");
+const wardrobe = [];
+
+function drawWardrobePreview(cv, skin) {
+  const size = 80;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = size * dpr;
+  cv.height = size * dpr;
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = "#f2f6fa";
+  c.fillRect(0, 0, size, size);
+  c.translate(size / 2, 33);
+  c.scale(1.9, 1.9);
+  drawFigur(c, skin, { acc: save.acc }, 0.2);
+}
+
+function buildShop() {
+  const gruppen = [...new Set(SKINS.map(s => s.gruppe))];
+  for (const gruppe of gruppen) {
+    const titel = document.createElement("h3");
+    titel.textContent = gruppe;
+    const grid = document.createElement("div");
+    grid.className = "skins";
+    for (const skin of SKINS.filter(s => s.gruppe === gruppe)) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "skin";
+      btn.id = "skin-" + skin.id;
+      btn.dataset.id = skin.id;
+      const cv = document.createElement("canvas");
+      wardrobe.push({ cv, skin });
+      const name = document.createElement("span");
+      name.textContent = skin.name;
+      const sammelt = document.createElement("small");
+      sammelt.textContent = "sammelt " + skin.item.name;
+      btn.append(cv, name, sammelt);
+      btn.addEventListener("click", () => chooseSkin(skin.id));
+      grid.append(btn);
+    }
+    shopList.append(titel, grid);
+  }
+  markSkin();
+}
+
+function markSkin() {
+  for (const btn of shopList.querySelectorAll(".skin")) {
+    btn.setAttribute("aria-pressed", btn.dataset.id === skinId ? "true" : "false");
+  }
+  for (const el of document.querySelectorAll(".skin-name")) el.textContent = currentSkin().name;
+  paintIcon(ui.walletIcon, currentSkin(), 20);
+}
+
+function chooseSkin(id) {
+  skinId = id;
+  try { localStorage.setItem("pistenflitzer-skin", id); } catch (e) {}
+  markSkin();
+}
+
+function openShop() {
+  for (const w of wardrobe) drawWardrobePreview(w.cv, w.skin);
+  openPanel(ui.shop);
+  const aktiv = $("skin-" + skinId);
+  if (aktiv) aktiv.focus();
+}
+
+// --- Itemshop ---
+const ladenList = $("laden-list");
+const previews = [];
+const GRUPPEN = [
+  { titel: "Spuren", arten: ["spur"] },
+  { titel: "Zubehör", arten: ["zubehoer"] },
+  { titel: "Power-ups", arten: ["verbrauch", "power"] }
+];
+
+const isOwned = item => save.owned.includes(item.id);
+function isActive(item) {
+  if (item.art === "spur") return save.trail === item.id;
+  if (item.art === "zubehoer") return save.acc.includes(item.id);
+  if (item.art === "power") return save.magnet;
+  return false;
+}
+function setActive(item, an) {
+  if (item.art === "spur") save.trail = an ? item.id : null;
+  if (item.art === "zubehoer") save.acc = an ? [...save.acc, item.id] : save.acc.filter(id => id !== item.id);
+  if (item.art === "power") save.magnet = an;
+}
+
+function buildLaden() {
+  for (const gruppe of GRUPPEN) {
+    const titel = document.createElement("h3");
+    titel.textContent = gruppe.titel;
+    const grid = document.createElement("div");
+    grid.className = "items";
+    for (const item of SHOP.filter(i => gruppe.arten.includes(i.art))) {
+      const card = document.createElement("article");
+      card.className = "item-card r-" + item.seltenheit;
+      card.id = "item-" + item.id;
+      card.innerHTML =
+        `<canvas class="item-preview"></canvas>` +
+        `<span class="rarity">${SELTENHEIT[item.seltenheit]}</span>` +
+        `<h4>${item.name}</h4><p>${item.text}</p>` +
+        `<button type="button" class="buy" id="buy-${item.id}"></button>` +
+        `<small class="owned-note" id="note-${item.id}"></small>`;
+      card.querySelector(".buy").addEventListener("click", () => shopAction(item, card));
+      previews.push({ cv: card.querySelector("canvas"), item });
+      grid.append(card);
+    }
+    ladenList.append(titel, grid);
+  }
+}
+
+function priceButton(btn, item) {
+  const icon = document.createElement("canvas");
+  paintIcon(icon, currentSkin(), 18);
+  btn.append("Kaufen ", icon, String(item.preis));
+  btn.disabled = save.coins < item.preis;
+}
+
+function refreshLaden() {
+  paintIcon(ui.purseIcon, currentSkin(), 28);
+  ui.purseCount.textContent = save.coins;
+  ui.purseName.textContent = currentSkin().item.name;
+  for (const item of SHOP) {
+    const btn = $("buy-" + item.id);
+    const note = $("note-" + item.id);
+    btn.className = "buy";
+    btn.disabled = false;
+    btn.replaceChildren();
+    const fehlt = item.preis - save.coins;
+    if (item.art === "verbrauch") {
+      priceButton(btn, item);
+      note.textContent = "Du hast " + save.shields + (fehlt > 0 ? " · dir fehlen noch " + fehlt : "");
+    } else if (!isOwned(item)) {
+      priceButton(btn, item);
+      note.textContent = fehlt > 0 ? "Dir fehlen noch " + fehlt : "";
+    } else {
+      const aktiv = isActive(item);
+      btn.classList.add(aktiv ? "active" : "owned");
+      btn.textContent = aktiv ? "Aktiv ✓" : "Benutzen";
+      note.textContent = aktiv ? "Tippen zum Ausschalten" : "Gekauft";
+    }
+  }
+}
+
+function pay(item, card) {
+  if (save.coins < item.preis) return false;
+  save.coins -= item.preis;
+  card.classList.remove("pop");
+  void card.offsetWidth;
+  card.classList.add("pop");
+  return true;
+}
+
+function shopAction(item, card) {
+  if (item.art === "verbrauch") {
+    if (pay(item, card)) save.shields++;
+  } else if (!isOwned(item)) {
+    if (pay(item, card)) { save.owned.push(item.id); setActive(item, true); }
+  } else {
+    setActive(item, !isActive(item));
+  }
+  storeSave();
+  refreshLaden();
+  $("buy-" + item.id).focus();
+}
+
+// Animierte Vorschau im Itemshop
+function drawPreviewTrail(c, id, t) {
+  const punkte = [];
+  for (let k = 0; k <= 24; k++) punkte.push([Math.sin(k * 0.25 - t * 3) * k * 0.35, 14 - k * 4]);
+  if (id === "regenbogen") {
+    c.lineWidth = 3;
+    REGENBOGEN.forEach((f, i) => { c.strokeStyle = f; strokeTrail(c, punkte, -7.5 + i * 3); });
+    return;
+  }
+  c.strokeStyle = "rgba(140, 165, 195, 0.55)";
+  c.lineWidth = 2;
+  for (const side of [-4, 4]) strokeTrail(c, punkte, side);
+  if (id === "glitzer") {
+    const farben = ["#ffd84d", "#7fdcff", "#ff9de2", "#ffd84d"];
+    punkte.forEach(([x, y], k) => {
+      if (k % 2) return;
+      c.globalAlpha = (Math.sin(t * 6 + k * 1.3) + 1) / 2;
+      stern(c, x + (k % 4 ? 6 : -6), y, 3, farben[k % 4], "rgba(20, 35, 58, 0.3)");
+    });
+  }
+  if (id === "feuer") {
+    punkte.forEach(([x, y], k) => {
+      const a = 1 - k / 24;
+      const flacker = 0.8 + 0.3 * Math.sin(t * 25 + k * 2);
+      c.globalAlpha = a;
+      kreis(c, x, y, (2 + a * 4) * flacker, k < 6 ? "#ffe14d" : k < 13 ? "#ff9f1c" : "#e63a1e");
+    });
+  }
+  c.globalAlpha = 1;
+}
+
+function drawMagnetPreview(c, skin, t) {
+  for (let i = 0; i < 4; i++) {
+    const phase = (t * 0.5 + i / 4) % 1;
+    const winkel = i * Math.PI / 2 + 0.5;
+    const r = 44 * (1 - phase);
+    c.globalAlpha = 1 - phase ** 4;
+    drawItem(c, skin, Math.cos(winkel) * r, Math.sin(winkel) * r + 4, 0.8, false);
+  }
+  c.globalAlpha = 1;
+  c.lineCap = "butt";
+  c.lineWidth = 4;
+  c.strokeStyle = "#d7261e";
+  c.beginPath(); c.moveTo(20, -30); c.lineTo(20, -22); c.arc(26, -22, 6, Math.PI, 0, true); c.lineTo(32, -30); c.stroke();
+  c.strokeStyle = "#c9d5e1";
+  c.beginPath(); c.moveTo(20, -34); c.lineTo(20, -30); c.moveTo(32, -34); c.lineTo(32, -30); c.stroke();
+}
+
+function drawShopPreview(cv, item, t) {
+  const r = cv.getBoundingClientRect();
+  const w = r.width || 160, h = r.height || 110;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = "#f2f6fa";
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = "rgba(160, 185, 210, 0.22)";
+  c.lineWidth = 2;
+  for (let y = -((t * 60) % 22); y < h; y += 22) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
+
+  const skin = currentSkin();
+  c.save();
+  c.translate(w / 2, item.art === "spur" ? h * 0.66 : h * 0.55);
+  c.scale(1.5, 1.5);
+  if (item.art === "spur") drawPreviewTrail(c, item.id, t);
+  if (item.id === "magnet") drawMagnetPreview(c, skin, t);
+  if (item.id === "schild") drawBubble(c, 0, 4, Math.sin(t * 4));
+  drawFigur(c, skin, { acc: item.art === "zubehoer" ? [item.id] : [] }, t);
+  c.restore();
+}
+
+function ladenLoop(t) {
+  if (ui.laden.hidden) return;
+  for (const p of previews) drawShopPreview(p.cv, p.item, reduceMotion ? 0.3 : t / 1000);
+  if (!reduceMotion) requestAnimationFrame(ladenLoop);
+}
+
+function openLaden() {
+  openPanel(ui.laden);
+  refreshLaden();
+  requestAnimationFrame(ladenLoop);
+  ui.laden.querySelector(".close-panel").focus();
+}
+
+// ===== Steuerung =====
+function setKey(code, down) {
+  if (code === "ArrowLeft" || code === "KeyA") keys.left = down;
+  if (code === "ArrowRight" || code === "KeyD") keys.right = down;
+}
+window.addEventListener("keydown", e => {
+  // Lehrer-Trick: Shift + G gibt 100 Sammel-Items
+  if (e.code === "KeyG" && e.shiftKey) {
+    save.coins += 100;
+    storeSave();
+    if (!ui.laden.hidden) refreshLaden();
+    return;
+  }
+  if (openPanelEl) { if (e.code === "Escape") closePanel(); return; }
+  // Leertaste oder Enter auf einem Knopf: der Knopf macht seine eigene Aktion
+  if (e.target.closest && e.target.closest("button") && (e.code === "Space" || e.code === "Enter")) return;
+  if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
+  setKey(e.code, true);
+  const wait = state.mode === "crash" && performance.now() - state.crashTime < 700;
+  if ((e.code === "Space" || e.code === "Enter") && state.mode !== "fahren" && !wait && !e.repeat) startGame();
+});
+window.addEventListener("keyup", e => setKey(e.code, false));
+window.addEventListener("blur", () => { keys.left = keys.right = false; });
+
+canvas.addEventListener("pointerdown", e => {
+  const r = canvas.getBoundingClientRect();
+  const leftHalf = e.clientX - r.left < r.width / 2;
+  keys.left = leftHalf;
+  keys.right = !leftHalf;
+});
+for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+  canvas.addEventListener(ev, () => { keys.left = keys.right = false; });
+}
+
+$("start-btn").addEventListener("click", startGame);
+$("again-btn").addEventListener("click", startGame);
+for (const btn of document.querySelectorAll(".open-shop")) btn.addEventListener("click", openShop);
+for (const btn of document.querySelectorAll(".open-laden")) btn.addEventListener("click", openLaden);
+for (const btn of document.querySelectorAll(".close-panel")) btn.addEventListener("click", closePanel);
+
+buildShop();
+buildLaden();
+reset();
+requestAnimationFrame(frame);
+</script>
