@@ -477,6 +477,7 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
       <div class="knoepfe">
         <button id="weiter-btn" class="go gruen" type="button">▶ Weiter</button>
         <button id="neustart-btn" class="go" type="button">↻ Neu starten</button>
+        <button id="laden-btn-3" class="go gruen" type="button">🛒 Itemshop</button>
       </div>
       <p class="hint nur-pc"><kbd>P</kbd> oder <kbd>Esc</kbd> = weiter</p>
     </div>
@@ -3347,7 +3348,8 @@ function starteCityJumper() {
   }
   let ladenVon = "start";
   function oeffneLaden() {
-    ladenVon = !$("over").hidden ? "over" : "start";
+    ladenVon = !$("pause").hidden ? "pause" : !$("over").hidden ? "over" : "start";
+    $("pause").hidden = true;
     $("start").hidden = true;
     $("over").hidden = true;
     $("laden").hidden = false;
@@ -3358,7 +3360,8 @@ function starteCityJumper() {
   function schliesseLaden() {
     $("laden").hidden = true;
     $(ladenVon).hidden = false;
-    $("home").style.display = "";
+    if (ladenVon !== "pause") $("home").style.display = "";
+    else $("weiter-btn").focus({ preventScroll: true });
     hud();
   }
 
@@ -3367,6 +3370,7 @@ function starteCityJumper() {
   $("again-btn").addEventListener("click", startGame);
   $("laden-btn-1").addEventListener("click", oeffneLaden);
   $("laden-btn-2").addEventListener("click", oeffneLaden);
+  $("laden-btn-3").addEventListener("click", oeffneLaden);
   $("laden-zu").addEventListener("click", schliesseLaden);
   // Geld-Knopf: jedes Mal +100 Geschenke
   for (const id of ["geld-btn", "geld-btn-2"]) $(id).addEventListener("click", () => { stand.geschenke += 100; speichern(); if (!$("laden").hidden) zeigeLaden(); else hud(); });
