@@ -35,7 +35,7 @@ body {
 
 .hud {
   position: absolute;
-  top: 12px;
+  top: max(12px, env(safe-area-inset-top, 0px));
   left: 0;
   right: 0;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -58,7 +58,8 @@ body {
 }
 .value {
   font-family: var(--display);
-  font-size: clamp(1.3rem, 5vw, 1.9rem);
+  font-size: clamp(0.95rem, 4.2vw, 1.9rem);
+  white-space: nowrap;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }

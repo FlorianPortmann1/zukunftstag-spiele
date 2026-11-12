@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="de">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#0b1030">
 <meta charset="utf-8">
 <title>City Jumper</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -86,7 +87,7 @@ body {
   position: absolute;
   top: calc(max(10px, env(safe-area-inset-top, 0px)) + 54px);
   left: max(16px, env(safe-area-inset-left, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 104px); /* Platz für Pause und Musik */
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -142,12 +143,14 @@ body {
 #prompt small, #dreh small { display: block; font-family: var(--body); font-size: 0.5em; letter-spacing: 0.1em; color: #fff; }
 @keyframes puls { to { transform: translate(-50%, -50%) scale(1.12); } }
 #hoho, #powerruf {
-  font-size: clamp(2.6rem, 12vw, 5.5rem);
+  font-size: clamp(1.6rem, 9vw, 5.5rem);
+  max-width: 94vw;
+  white-space: normal;
   color: var(--rot);
   text-shadow: 0 0 24px rgba(255, 59, 79, 0.9), 0 4px 0 #fff;
   animation: plopp 0.5s cubic-bezier(.2, 1.6, .4, 1);
 }
-#powerruf { top: 22%; font-size: clamp(1.6rem, 7vw, 3rem); color: var(--gold); text-shadow: 0 0 20px rgba(255, 211, 77, 0.9), 0 3px 0 #000; }
+#powerruf { top: 22%; font-size: clamp(1.2rem, 6vw, 3rem); color: var(--gold); text-shadow: 0 0 20px rgba(255, 211, 77, 0.9), 0 3px 0 #000; }
 @keyframes plopp { from { transform: translate(-50%, -50%) scale(0.2); opacity: 0; } }
 
 /* ----- Karten ----- */
@@ -286,8 +289,8 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
 .pad-knopf {
   position: absolute;
   bottom: max(18px, env(safe-area-inset-bottom, 0px));
-  width: 78px;
-  height: 78px;
+  width: min(78px, 19vw);
+  height: min(78px, 19vw);
   border-radius: 50%;
   border: 2px solid rgba(155, 231, 255, 0.7);
   background: rgba(11, 16, 48, 0.45);
@@ -297,16 +300,17 @@ body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-k
   -webkit-tap-highlight-color: transparent;
 }
 .pad-knopf.links { left: max(16px, env(safe-area-inset-left, 0px)); }
-.pad-knopf.rechts { left: calc(max(16px, env(safe-area-inset-left, 0px)) + 92px); }
+.pad-knopf.rechts { left: calc(max(16px, env(safe-area-inset-left, 0px)) + min(92px, 22vw)); }
 .pad-knopf.rutsch {
-  right: calc(max(16px, env(safe-area-inset-right, 0px)) + 108px);
+  right: calc(max(16px, env(safe-area-inset-right, 0px)) + min(9px, 2vw));
+  bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + min(108px, 26vw));
   border-color: var(--gold);
   background: rgba(255, 211, 77, 0.2);
 }
 .pad-knopf.sprung {
   right: max(16px, env(safe-area-inset-right, 0px));
-  width: 96px;
-  height: 96px;
+  width: min(96px, 23vw);
+  height: min(96px, 23vw);
   border-color: var(--rot);
   background: rgba(255, 59, 79, 0.3);
   font-size: 2.4rem;

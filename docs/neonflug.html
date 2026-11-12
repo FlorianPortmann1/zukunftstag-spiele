@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="de">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#0b1030">
 <meta charset="utf-8">
 <title>Neonflug</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -39,7 +40,7 @@ body {
 
 .hud {
   position: absolute;
-  top: 12px;
+  top: max(12px, env(safe-area-inset-top, 0px));
   left: 0;
   right: 0;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -62,7 +63,8 @@ body {
 .value {
   font-family: var(--body);
   font-weight: 700;
-  font-size: clamp(1.3rem, 5vw, 2rem);
+  font-size: clamp(0.95rem, 4.2vw, 2rem);
+  white-space: nowrap;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 12px rgba(255, 42, 157, 0.7);
@@ -143,6 +145,29 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .go { transition: none; }
 }
+.knoepfe { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.go.cyan { border-color: var(--cyan); background: rgba(41, 240, 255, 0.12); box-shadow: 0 0 18px rgba(41, 240, 255, 0.6), inset 0 0 14px rgba(41, 240, 255, 0.35); }
+#laden { place-items: stretch; padding-top: max(12px, env(safe-area-inset-top, 0px)); padding-bottom: 12px; background: rgba(13, 2, 33, 0.95); overflow: hidden; }
+.laden-panel { width: 100%; max-width: 900px; margin: 0 auto; display: grid; grid-template-rows: auto auto 1fr; gap: 12px; min-height: 0; height: 100%; }
+.laden-kopf { display: flex; align-items: center; gap: 10px; }
+.laden-kopf h3 { margin: 0; flex: 1; font: 400 clamp(1.3rem, 6vw, 2rem) var(--display); color: var(--ink); }
+.beutel { font-weight: 700; font-size: 1.1rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--cyan); color: var(--cyan); }
+.geld { font: 700 0.85rem var(--body); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--sun); background: rgba(255, 179, 71, 0.15); color: var(--sun); cursor: pointer; }
+.zu { font: 700 1.3rem var(--body); width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--cyan); background: transparent; color: var(--ink); cursor: pointer; }
+.tabs { display: flex; gap: 8px; }
+.tab { font: 700 0.95rem var(--body); padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(41, 240, 255, 0.4); background: transparent; color: var(--ink); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--pink); border-color: var(--pink); }
+.liste { overflow-y: auto; min-height: 0; touch-action: pan-y; }
+.gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.karte { border-radius: 14px; padding: 10px; display: grid; gap: 6px; justify-items: center; text-align: center; background: linear-gradient(180deg, #2a0a4a, #12042a); border: 2px solid rgba(41, 240, 255, 0.35); }
+.karte.aktiv { border-color: var(--pink); box-shadow: 0 0 14px rgba(255, 42, 157, 0.6); }
+.karte canvas { width: 120px; height: 80px; }
+.karte .name { font-weight: 700; }
+.kauf { font: 700 0.95rem var(--body); width: 100%; padding: 8px; border-radius: 10px; border: 0; cursor: pointer; background: var(--sun); color: #2a1200; }
+.kauf.besitz { background: var(--cyan); color: #0d0221; }
+.kauf:disabled { background: #3a2a5a; color: #bba; cursor: default; }
+.karte.wackel { animation: wackel 0.35s; }
+@keyframes wackel { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 </style>
 
 <div id="stage">
@@ -162,7 +187,11 @@ kbd {
       <p>Steuern mit <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> oder <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd>.<br>
         <kbd>Leertaste</kbd> = Fassrolle, macht dich kurz unverwundbar.<br>
         Auf dem Handy: Finger auf den Bildschirm halten und ziehen.</p>
-      <button id="start-btn" class="go" type="button">Abheben!</button>
+      <div class="knoepfe">
+        <button id="start-btn" class="go" type="button">Abheben!</button>
+        <button id="laden-btn-1" class="go cyan" type="button">🛒 Hangar</button>
+      </div>
+      <p id="beutel-start" class="hint">💎 0 Kristalle im Beutel</p>
       <p id="load-error" class="fehler" hidden>Die 3D-Grafik konnte nicht geladen werden. Prüf die Internetverbindung und lade die Seite neu.</p>
     </div>
   </div>
@@ -173,8 +202,23 @@ kbd {
       <div class="result" id="result">0 m</div>
       <p id="loot-text">0 Kristalle</p>
       <p id="record-text">Rekord: 0 m</p>
-      <button id="again-btn" class="go" type="button">Nochmal!</button>
+      <div class="knoepfe">
+        <button id="again-btn" class="go" type="button">Nochmal!</button>
+        <button id="laden-btn-2" class="go cyan" type="button">🛒 Hangar</button>
+      </div>
       <p class="hint">Oder <kbd>Leertaste</kbd> drücken</p>
+    </div>
+  </div>
+  <div id="laden" class="overlay" hidden>
+    <div class="laden-panel" role="dialog" aria-label="Hangar">
+      <div class="laden-kopf">
+        <h3>🛒 Hangar</h3>
+        <span id="beutel" class="beutel">💎 0</span>
+        <button id="geld-btn" class="geld" type="button">💰 +100</button>
+        <button id="laden-zu" class="zu" type="button" aria-label="Hangar schliessen">✕</button>
+      </div>
+      <div class="tabs" id="tabs"></div>
+      <div class="liste" id="liste"></div>
     </div>
   </div>
 </div>
@@ -192,6 +236,7 @@ const EINSTELLUNGEN = {
   mauerAbstand: 160,     // alle so viele Meter kommt eine Mauer mit Loch
   lochBreite: 8,         // so breit ist das Loch in der Mauer (vorher 5)
   lochHoehe: 6,          // so hoch ist das Loch in der Mauer (vorher 3.6)
+  mauerFreiraum: 18,     // so viele Meter vor und hinter einer Mauer kommt nichts anderes
   rollDauer: 0.6,        // Sekunden, die eine Fassrolle dauert
   rollPause: 1.5         // Sekunden bis zur nächsten Fassrolle
 };
@@ -199,6 +244,26 @@ const BREITE = 9;        // so weit darf das Schiff nach links und rechts
 const HOEHE_MIN = 1;
 const HOEHE_MAX = 8;
 const SPAWN_Z = -170;    // hier tauchen neue Dinge auf
+
+// ===== Hangar (Itemshop) =====
+const SCHIFFE = [
+  { id: "standard", name: "Neon-Pfeil", preis: 0, rumpf: 0xe8e8ff, akzent: 0xff2a9d, cockpit: 0x29f0ff, fluegel: 1 },
+  { id: "feuer", name: "Feuervogel", preis: 40, rumpf: 0xffd0a0, akzent: 0xff5a1a, cockpit: 0xffd34d, fluegel: 1.2 },
+  { id: "eis", name: "Eisblitz", preis: 60, rumpf: 0xffffff, akzent: 0x6fd3ff, cockpit: 0xbfefff, fluegel: 0.85 },
+  { id: "gift", name: "Giftzahn", preis: 80, rumpf: 0x2a2a2a, akzent: 0x3dff8a, cockpit: 0xb25cff, fluegel: 1.3 },
+  { id: "nacht", name: "Nachtjäger", preis: 120, rumpf: 0x15151c, akzent: 0xff2233, cockpit: 0xff2233, fluegel: 1.45 },
+  { id: "weihnacht", name: "Rentier-Rakete", preis: 150, rumpf: 0xffffff, akzent: 0xd61f2c, cockpit: 0x3dff8a, fluegel: 1 },
+  { id: "gold", name: "Goldkomet", preis: 200, rumpf: 0xffd34d, akzent: 0xffaa00, cockpit: 0xffffff, fluegel: 1.1 },
+  { id: "regenbogen", name: "Regenbogen", preis: 300, rumpf: 0xffffff, akzent: "regenbogen", cockpit: 0xffffff, fluegel: 1.2 }
+];
+const DUESEN = [
+  { id: "pink", name: "Pink", preis: 0, farbe: 0xff2a9d },
+  { id: "cyan", name: "Cyan", preis: 20, farbe: 0x29f0ff },
+  { id: "gold", name: "Gold", preis: 40, farbe: 0xffd34d },
+  { id: "gruen", name: "Giftgrün", preis: 40, farbe: 0x3dff8a },
+  { id: "regenbogen", name: "Regenbogen", preis: 120, farbe: "regenbogen" }
+];
+const STAND_KEY = "neonflug-spielstand";
 
 const $ = id => document.getElementById(id);
 const ui = {
@@ -370,17 +435,52 @@ function starteNeonflug() {
     mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), line));
     mesh.position.set(x, y, z);
     scene.add(mesh);
-    blocks.push({ mesh, hx: w / 2, hy: h / 2, hz: d / 2 });
+    const b = { mesh, hx: w / 2, hy: h / 2, hz: d / 2 };
+    blocks.push(b);
+    return b;
+  }
+  const gelbLine = new THREE.LineBasicMaterial({ color: 0xffd34d });
+  const gruenLine = new THREE.LineBasicMaterial({ color: 0x3dff8a });
+  // Ist hier in der Nähe eine Mauer? Dann nichts anderes hinstellen.
+  function naheMauer(z) {
+    return blocks.some(b => b.mauer && Math.abs(b.mesh.position.z - z) < EINSTELLUNGEN.mauerFreiraum);
   }
   function spawnBlock(z) {
-    if (Math.random() < 0.5) {
+    if (naheMauer(z)) return;
+    const r = Math.random();
+    if (r < 0.3) {
       // Säule vom Boden aus
       const h = rand(4, 10), w = rand(1.5, 3.5);
       addBox(rand(-BREITE, BREITE), h / 2, w, h, w, z, pinkLine);
-    } else {
+    } else if (r < 0.5) {
       // schwebender Würfel
       const s = rand(1.5, 3.5);
       addBox(rand(-BREITE, BREITE), rand(HOEHE_MIN + 1, HOEHE_MAX), s, s, s, z, cyanLine);
+    } else if (r < 0.65) {
+      // Schieber: fährt hin und her
+      const s = rand(1.8, 2.8), y = rand(HOEHE_MIN + 1, HOEHE_MAX), ph = rand(0, 6), sp = rand(1.2, 2.2);
+      const b = addBox(0, y, s, s, s, z, gruenLine);
+      b.beweg = (b, t) => { b.mesh.position.x = Math.sin(t * sp + ph) * BREITE; b.mesh.rotation.z = t * 2; };
+    } else if (r < 0.78) {
+      // Hüpfer: geht hoch und runter
+      const s = rand(1.8, 2.8), x = rand(-BREITE, BREITE), ph = rand(0, 6), sp = rand(1.5, 2.5);
+      const b = addBox(x, 3, s, s, s, z, gruenLine);
+      b.beweg = (b, t) => { b.mesh.position.y = (HOEHE_MIN + HOEHE_MAX) / 2 + Math.sin(t * sp + ph) * (HOEHE_MAX - HOEHE_MIN) / 2; };
+    } else if (r < 0.9) {
+      // Laser-Balken quer: drüber oder drunter durch
+      const y = rand(2.8, 6.2);
+      const b = addBox(0, y, BREITE * 2 + 6, 0.6, 0.6, z, gelbLine);
+      const schein = new THREE.Sprite(glowMat(0xffd34d)); schein.scale.set(BREITE * 2 + 6, 2, 1); b.mesh.add(schein);
+    } else {
+      // Drehkreuz: ein Balken, der sich dreht (aus 5 Stücken)
+      const cx = rand(-BREITE + 4, BREITE - 4), cy = (HOEHE_MIN + HOEHE_MAX) / 2, ph = rand(0, 6), sp = rand(0.8, 1.4) * (Math.random() < 0.5 ? -1 : 1);
+      for (let i = -2; i <= 2; i++) {
+        if (i === 0) continue;
+        const b = addBox(cx, cy, 1.2, 1.2, 1.2, z, gelbLine);
+        b.beweg = (b, t) => { const a = t * sp + ph; b.mesh.position.x = cx + Math.cos(a) * i * 1.6; b.mesh.position.y = cy + Math.sin(a) * i * 1.6; };
+      }
+      const nabe = addBox(cx, cy, 1, 1, 1, z, gelbLine);
+      nabe.beweg = (b, t) => { b.mesh.rotation.z = t * 3; };
     }
   }
   function spawnMauer(z) {
@@ -393,8 +493,11 @@ function starteNeonflug() {
     addBox(gx, (gy - gh / 2) / 2, gw, gy - gh / 2, 1, z, pinkLine);
     addBox(gx, (gy + gh / 2 + T) / 2, gw, T - (gy + gh / 2), 1, z, pinkLine);
     spawnKristall(gx, gy, z); // Belohnung im Loch
-    // vor und hinter der Mauer Platz lassen
-    for (const b of blocks) if (Math.abs(b.mesh.position.z - z) < 12 && b.hz > 0.5) b.weg = true;
+    blocks.slice(-4).forEach(b => { b.mauer = true; });
+    // vor und hinter der Mauer Platz lassen (keine Blöcke, keine anderen Kristalle)
+    const F = EINSTELLUNGEN.mauerFreiraum;
+    for (const b of blocks) if (!b.mauer && Math.abs(b.mesh.position.z - z) < F) b.weg = true;
+    for (const k of kristalle) if (Math.abs(k.position.z - z) < F && Math.abs(k.position.z - z) > 0.01) k.weg = true;
   }
 
   // ===== Kristalle =====
@@ -411,6 +514,7 @@ function starteNeonflug() {
     kristalle.push(m);
   }
   function spawnKristallReihe(z) {
+    if (naheMauer(z)) return;
     const x = rand(-BREITE + 1, BREITE - 1), y = rand(HOEHE_MIN + 0.5, HOEHE_MAX - 0.5);
     const n = Math.random() < 0.5 ? 5 : 1;
     for (let i = 0; i < n; i++) spawnKristall(clamp(x + Math.sin(i * 0.8) * 2, -BREITE, BREITE), y, z - i * 4);
@@ -457,6 +561,7 @@ function starteNeonflug() {
       roll: 0, rollPause: 0, target: null, blockBudget: 0, kristallBudget: 0, naechsteMauer: EINSTELLUNGEN.mauerAbstand
     });
     ship.visible = true;
+    $("laden").hidden = true;
     ui.start.hidden = true;
     ui.over.hidden = true;
   }
@@ -473,6 +578,9 @@ function starteNeonflug() {
     ui.result.textContent = m + " m";
     ui.lootText.textContent = state.crystals + (state.crystals === 1 ? " Kristall" : " Kristalle") + " gesammelt";
     ui.recordText.textContent = neu ? "Neuer Rekord!" : "Rekord: " + state.best + " m";
+    stand.kristalle += state.crystals;
+    speichern();
+    beutelZeigen();
     setTimeout(() => { ui.over.hidden = false; $("again-btn").focus(); }, 1000);
   }
 
@@ -530,6 +638,7 @@ function starteNeonflug() {
     }
     for (const b of blocks) {
       b.mesh.position.z += dz;
+      if (b.beweg) b.beweg(b, state.t);
       if (b.mesh.position.z > 15) b.weg = true;
     }
     for (const k of kristalle) {
@@ -594,6 +703,7 @@ function starteNeonflug() {
     const rollWinkel = state.roll > 0 ? (1 - state.roll / EINSTELLUNGEN.rollDauer) * Math.PI * 2 : 0;
     ship.position.set(state.x, state.y, 0);
     ship.rotation.z = -state.vx * 0.05 - rollWinkel;
+    if (stand.schiff === "regenbogen" || stand.duese === "regenbogen") schiffAnmalen(state.t);
     ship.rotation.x = state.vy * 0.03;
     duese.scale.setScalar(1.6 + Math.random() * 0.5);
 
@@ -664,8 +774,101 @@ function starteNeonflug() {
   $("start-btn").addEventListener("click", startGame);
   $("again-btn").addEventListener("click", startGame);
 
+  // ===== Hangar: Spielstand, Schiff anmalen, Laden =====
+  let stand = { kristalle: 0, besitz: ["standard", "pink"], schiff: "standard", duese: "pink" };
+  try { const g = JSON.parse(localStorage.getItem(STAND_KEY) || "null"); if (g) stand = Object.assign(stand, g); } catch (e) {}
+  const speichern = () => { try { localStorage.setItem(STAND_KEY, JSON.stringify(stand)); } catch (e) {} };
+  const hat = id => stand.besitz.includes(id);
+  const farbeVon = (f, t) => f === "regenbogen" ? new THREE.Color().setHSL((t * 0.3) % 1, 1, 0.55) : new THREE.Color(f);
+  function schiffAnmalen(t = 0) {
+    const sk = SCHIFFE.find(x => x.id === stand.schiff) || SCHIFFE[0];
+    const du = DUESEN.find(x => x.id === stand.duese) || DUESEN[0];
+    bodyMat.color.set(sk.rumpf);
+    const ak = farbeVon(sk.akzent, t);
+    pinkMat.color.copy(ak); pinkMat.emissive.copy(ak);
+    cyanMat.color.set(sk.cockpit); cyanMat.emissive.set(sk.cockpit);
+    fluegel.scale.x = sk.fluegel;
+    const df = farbeVon(du.farbe, t);
+    dueseMat.color.copy(df);
+    duese.material.color.copy(df);
+  }
+  schiffAnmalen();
+  function beutelZeigen() {
+    $("beutel").textContent = "💎 " + stand.kristalle;
+    $("beutel-start").textContent = "💎 " + stand.kristalle + " Kristalle im Beutel";
+  }
+  beutelZeigen();
+  function schiffBild(sk) {
+    const cv = document.createElement("canvas"); cv.width = 240; cv.height = 160;
+    const c = cv.getContext("2d");
+    const hex = f => f === "regenbogen" ? "#ff5cf0" : "#" + new THREE.Color(f).getHexString();
+    c.translate(120, 80);
+    c.fillStyle = hex(sk.akzent); c.shadowColor = hex(sk.akzent); c.shadowBlur = 20;
+    c.fillRect(-70 * sk.fluegel, 10, 140 * sk.fluegel, 18);
+    c.shadowBlur = 0;
+    c.fillStyle = hex(sk.rumpf); c.beginPath(); c.moveTo(0, -70); c.lineTo(22, 50); c.lineTo(-22, 50); c.closePath(); c.fill();
+    c.fillStyle = hex(sk.cockpit); c.beginPath(); c.ellipse(0, -10, 9, 18, 0, 0, 7); c.fill();
+    return cv;
+  }
+  let aktiverTab = "schiffe";
+  function zeigeLaden() {
+    beutelZeigen();
+    const tabs = $("tabs"); tabs.innerHTML = "";
+    for (const [id, name] of [["schiffe", "🚀 Schiffe"], ["duesen", "🔥 Düsen"]]) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "tab"; b.textContent = name;
+      b.setAttribute("aria-selected", String(id === aktiverTab));
+      b.onclick = () => { aktiverTab = id; zeigeLaden(); };
+      tabs.appendChild(b);
+    }
+    const liste = $("liste"); liste.innerHTML = "";
+    const gitter = document.createElement("div"); gitter.className = "gitter";
+    const daten = aktiverTab === "schiffe" ? SCHIFFE : DUESEN;
+    const aktivId = aktiverTab === "schiffe" ? stand.schiff : stand.duese;
+    for (const d of daten) {
+      const k = document.createElement("div"); k.className = "karte" + (d.id === aktivId ? " aktiv" : "");
+      if (aktiverTab === "schiffe") k.appendChild(schiffBild(d));
+      else { const e = document.createElement("div"); e.style.cssText = "width:70px;height:70px;border-radius:50%;margin:5px;background:" + (d.farbe === "regenbogen" ? "conic-gradient(red,orange,yellow,lime,cyan,blue,magenta,red)" : "#" + new THREE.Color(d.farbe).getHexString()) + ";box-shadow:0 0 20px currentColor"; k.appendChild(e); }
+      const n = document.createElement("div"); n.className = "name"; n.textContent = d.name; k.appendChild(n);
+      const knopf = document.createElement("button"); knopf.type = "button"; knopf.className = "kauf";
+      if (hat(d.id)) {
+        knopf.className += " besitz";
+        knopf.textContent = d.id === aktivId ? "✓ Aktiv" : "Auswählen";
+        knopf.disabled = d.id === aktivId;
+        knopf.onclick = () => { if (aktiverTab === "schiffe") stand.schiff = d.id; else stand.duese = d.id; speichern(); schiffAnmalen(); zeigeLaden(); };
+      } else {
+        knopf.textContent = "💎 " + d.preis;
+        knopf.onclick = () => {
+          if (stand.kristalle < d.preis) { k.classList.remove("wackel"); void k.offsetWidth; k.classList.add("wackel"); knopf.textContent = "Fehlen noch 💎 " + (d.preis - stand.kristalle); return; }
+          stand.kristalle -= d.preis; stand.besitz.push(d.id);
+          if (aktiverTab === "schiffe") stand.schiff = d.id; else stand.duese = d.id;
+          speichern(); schiffAnmalen(); zeigeLaden();
+        };
+      }
+      k.appendChild(knopf);
+      gitter.appendChild(k);
+    }
+    liste.appendChild(gitter);
+  }
+  let ladenVon = "start";
+  function oeffneLaden() {
+    ladenVon = ui.over.hidden ? "start" : "over";
+    ui.start.hidden = true; ui.over.hidden = true;
+    $("laden").hidden = false;
+    zeigeLaden();
+  }
+  function schliesseLaden() {
+    $("laden").hidden = true;
+    $(ladenVon).hidden = false;
+    beutelZeigen();
+  }
+  $("laden-btn-1").addEventListener("click", oeffneLaden);
+  $("laden-btn-2").addEventListener("click", oeffneLaden);
+  $("laden-zu").addEventListener("click", schliesseLaden);
+  $("geld-btn").addEventListener("click", () => { stand.kristalle += 100; speichern(); zeigeLaden(); });
+  window.addEventListener("keydown", e => { if (e.key === "Escape" && !$("laden").hidden) schliesseLaden(); });
+
   // für Tests in der Konsole
-  window.neonflug = { state, startGame, update, blocks, kristalle };
+  window.neonflug = { state, startGame, update, blocks, kristalle, get stand() { return stand; }, oeffneLaden };
 
   requestAnimationFrame(frame);
 }

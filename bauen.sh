@@ -11,6 +11,7 @@ for spiel in pistenflitzer neonflug cityjumper; do
     printf '%s\n' '<!doctype html>'
     printf '%s\n' '<html lang="de">'
     printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">'
+    printf '%s\n' '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#0b1030">'
     cat "$spiel.html"
   } > "docs/$spiel.html"
   echo "gebaut: docs/$spiel.html"
