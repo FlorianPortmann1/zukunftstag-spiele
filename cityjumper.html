@@ -1561,7 +1561,7 @@ function starteCityJumper() {
       laenge = rand(12, 26) - diff * 3;
       breite = rand(6.6, 10);
       if (ecke) { laenge = breite = rand(10, 12); luecke = Math.min(luecke, 4.5); }
-      if (wohnung) { laenge = E.wohnungLaenge; breite = 9; top = Math.max(top, 20); }
+      if (wohnung) { laenge = E.wohnungLaenge; breite = 9; top = Math.max(14, vorher.top - rand(0.5, 1.5)); luecke = Math.min(luecke, 4); } // nie höher als das Dach davor, kleine Lücke
     }
     const z0 = naechsteFront - luecke;
     const z1 = z0 - laenge;
@@ -1751,12 +1751,11 @@ function starteCityJumper() {
     return { tp, tt, te };
   }
   let INNEN = null;
+  const unsichtbar = new THREE.MeshBasicMaterial({ visible: false });
   const lochTextur = (() => {
     const [cv, c] = leinwand(256, 256);
     for (let i = -256; i < 512; i += 32) { c.fillStyle = (i / 32) % 2 ? "#111" : "#ffd34d"; c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 16, 0); c.lineTo(i + 16 - 256, 256); c.lineTo(i - 256, 256); c.fill(); }
-    const g = c.createRadialGradient(128, 128, 10, 128, 128, 120);
-    g.addColorStop(0, "#000"); g.addColorStop(0.85, "#050510"); g.addColorStop(1, "#1a1030");
-    c.fillStyle = g; c.fillRect(22, 22, 212, 212);
+    c.clearRect(22, 22, 212, 212); // Mitte offen: das ist das echte Loch
     return new THREE.CanvasTexture(cv);
   })();
   function textTextur(text, farbe) {
@@ -1854,8 +1853,17 @@ function starteCityJumper() {
     // Decke: vorne offen, dort ist das Loch, durch das man reinfällt
     const LOCH = 12;
     const decke = new THREE.Mesh(new THREE.PlaneGeometry(w, L - LOCH), deckeMat); decke.rotation.x = Math.PI / 2; decke.position.set(0, H, -LOCH / 2); g.add(decke);
-    // Loch im Dach (oben aufs Dach gemalt) mit Warnstreifen
-    const lochMesh = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, 8), new THREE.MeshBasicMaterial({ map: lochTextur }));
+    // Echtes Loch im Dach: das normale Dach wird unsichtbar, dafür zwei Dachstücke mit einer Lücke dazwischen
+    b.mesh.material = b.mesh.material.slice();
+    b.mesh.material[2] = unsichtbar;
+    b.lochVorne = b.z0 - 3.5;
+    b.lochHinten = b.z0 - 11.5;
+    for (const [laenge_, mitte] of [[3.5, L / 2 - 1.75], [L - 11.5, (L / 2 - 11.5 - L / 2) / 2]]) {
+      const d = new THREE.Mesh(new THREE.PlaneGeometry(w, laenge_), DACH_MATS.schnee);
+      d.rotation.x = -Math.PI / 2; d.position.set(0, 6.01, mitte); g.add(d);
+    }
+    // Warnstreifen rund ums Loch
+    const lochMesh = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, 8), new THREE.MeshBasicMaterial({ map: lochTextur, transparent: true }));
     lochMesh.rotation.x = -Math.PI / 2; lochMesh.position.set(0, 6.04, L / 2 - 7.5); g.add(lochMesh);
     const lochGlanz = new THREE.Sprite(glowMat(0xff3355, { opacity: 0.6 })); lochGlanz.scale.set(10, 5, 1); lochGlanz.position.set(0, 6.5, L / 2 - 7.5); g.add(lochGlanz);
     for (const sx of [-2.5, 0, 2.5]) { const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false })); pf.scale.set(1.2, 1.2, 1); pf.position.set(sx, 7.6, L / 2 - 4); g.add(pf); }
@@ -2037,16 +2045,17 @@ function starteCityJumper() {
     } else if (typ === "banner") {
       // Weihnachts-Banner über das ganze Dach: drunter durchrutschen!
       x = 0;
-      hx = b.halb; hz = 0.3; unten = 1.05; h = 3.6;
-      for (const s of [-1, 1]) { const p = box(0.22, 3.6, 0.22, pfostenMat); p.position.set(s * (b.halb - 0.15), 1.8, 0); g.add(p); }
-      const balken = box(b.halb * 2, 2.5, 0.2, std(0x7a0f1c, { transparent: true, opacity: 0.45, depthWrite: false })); balken.position.y = 2.33; g.add(balken); // leicht durchsichtig
+      hx = b.halb; hz = 0.3; unten = 1.05; h = 1.75; // flach: drunter durchrutschen ODER drüberspringen
+      for (const s of [-1, 1]) { const p = box(0.18, 1.8, 0.18, pfostenMat); p.position.set(s * (b.halb - 0.15), 0.9, 0); g.add(p); }
+      const balken = box(b.halb * 2, 0.7, 0.2, std(0x7a0f1c, { transparent: true, opacity: 0.45, depthWrite: false })); balken.position.y = 1.4; g.add(balken); // leicht durchsichtig
       const schildMat = waehle(SCHILDER).clone(); schildMat.opacity = 0.75;
       const schild = new THREE.Mesh(schildGeo, schildMat);
-      schild.scale.set(Math.min(1, (b.halb * 2 - 0.6) / 6.4), 1.2, 1);
-      schild.position.set(0, 2.2, 0.12); g.add(schild);
+      schild.scale.set(Math.min(1, (b.halb * 2 - 0.6) / 6.4), 0.45, 1);
+      schild.position.set(0, 1.4, 0.12); g.add(schild);
       for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(kugelGeo, waehle(kugelMats)); l.scale.setScalar(1.6); l.position.set(-b.halb + 0.4 + i * (b.halb * 2 - 0.8) / 9, 1.08, 0.12); g.add(l); }
       const pf = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬇️"), transparent: true, depthWrite: false }));
-      pf.scale.set(1, 1, 1); pf.position.set(0, 0.55, 0.3); g.add(pf);
+      pf.scale.set(0.8, 0.8, 1); pf.position.set(0, 0.55, 0.3); g.add(pf);
+      const pfo = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTextur("⬆️"), transparent: true, depthWrite: false })); pfo.scale.set(0.8, 0.8, 1); pfo.position.set(0, 2.3, 0.3); g.add(pfo);
     } else {
       const u = kugel(0.55, weissMat); u.position.y = 0.5; g.add(u);
       const o = kugel(0.38, weissMat); o.position.y = 1.2; g.add(o);
@@ -2932,7 +2941,7 @@ function starteCityJumper() {
     // Wohnung: durchs Loch rein, mit dem Aufzug raus
     if (!drinnen) {
       const W = gebaeude.find(g => g.wohnung && !g.betreten && g.segs.includes(pSeg));
-      if (W && p.z <= W.z0 - 4 && p.z > W.z1 + 10 && p.y > W.boden + 3) betreteWohnung(W);
+      if (W && p.z <= W.lochVorne && p.z >= W.lochHinten && Math.abs(p.x) < W.halb - 0.3 && p.y > W.boden + 3 && p.y < W.top + 0.6) betreteWohnung(W);
     } else {
       if (amBoden) drinnen.gelandet = true;
       // Haus von aussen ausblenden, sobald die Kamera unter dem Dach ist
