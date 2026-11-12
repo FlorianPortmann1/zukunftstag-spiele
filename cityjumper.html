@@ -223,8 +223,50 @@ kbd {
 .go:focus-visible, .tab:focus-visible, .kauf:focus-visible, .zu:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .hint { font-size: 0.85rem !important; color: var(--eis); opacity: 0.85; }
 .fehler { color: var(--gold); font-weight: 700; }
-.nur-handy { display: none; }
-@media (pointer: coarse) { .nur-handy { display: inline; } .nur-pc { display: none; } }
+.nur-handy, .steuerwahl { display: none; }
+@media (pointer: coarse) {
+  .nur-handy { display: inline; }
+  .steuerwahl { display: flex; }
+  .nur-pc { display: none; }
+}
+.steuerwahl { gap: 8px; align-items: center; justify-content: center; font-weight: 700; }
+.steuerwahl button {
+  font: 700 0.95rem var(--body);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--eis);
+  background: transparent;
+  color: var(--ink);
+}
+.steuerwahl button[aria-pressed="true"] { background: var(--eis); color: var(--nacht); }
+body[data-steuer="knoepfe"] .hilfe-wischen, body[data-steuer="wischen"] .hilfe-knoepfe { display: none; }
+
+/* Handy-Knöpfe: links/rechts unten links, Springen unten rechts */
+.pad-knopf {
+  position: absolute;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 2px solid rgba(155, 231, 255, 0.7);
+  background: rgba(11, 16, 48, 0.45);
+  color: #fff;
+  font-size: 2rem;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pad-knopf.links { left: max(16px, env(safe-area-inset-left, 0px)); }
+.pad-knopf.rechts { left: calc(max(16px, env(safe-area-inset-left, 0px)) + 92px); }
+.pad-knopf.sprung {
+  right: max(16px, env(safe-area-inset-right, 0px));
+  width: 96px;
+  height: 96px;
+  border-color: var(--rot);
+  background: rgba(255, 59, 79, 0.3);
+  font-size: 2.4rem;
+}
+.pad-knopf.gedrueckt { background: rgba(155, 231, 255, 0.45); transform: scale(0.94); }
+.pad-knopf.sprung.gedrueckt { background: rgba(255, 59, 79, 0.6); }
 
 /* ----- Itemshop ----- */
 #laden { place-items: stretch; padding-top: max(12px, env(safe-area-inset-top, 0px)); padding-bottom: 12px; background: rgba(6, 9, 28, 0.94); overflow: hidden; }
@@ -375,9 +417,15 @@ kbd {
   </div>
 
   <div id="prompt" class="ruf" hidden>🪂 FALLSCHIRM!<small><span class="nur-pc">LEERTASTE DRÜCKEN</span><span class="nur-handy">JETZT TIPPEN!</span></small></div>
-  <div id="dreh" class="ruf" hidden><span id="dreh-text">⬅ LINKS!</span><small><span class="nur-pc">PFEILTASTE DRÜCKEN</span><span class="nur-handy">ZUR SEITE WISCHEN</span></small></div>
+  <div id="dreh" class="ruf" hidden><span id="dreh-text">⬅ LINKS!</span><small><span class="nur-pc">PFEILTASTE DRÜCKEN</span><span class="nur-handy">IN DIE RICHTUNG LENKEN</span></small></div>
   <div id="hoho" class="ruf" hidden>HO HO HO!</div>
   <div id="powerruf" class="ruf" hidden></div>
+
+  <div id="pad" hidden>
+    <button id="k-links" class="pad-knopf links" type="button" aria-label="Links">◀</button>
+    <button id="k-rechts" class="pad-knopf rechts" type="button" aria-label="Rechts">▶</button>
+    <button id="k-sprung" class="pad-knopf sprung" type="button" aria-label="Springen">⬆</button>
+  </div>
 
   <a id="home" class="home" href="index.html" aria-label="Zurück zur Spielauswahl" title="Zurück zur Spielauswahl" hidden>🏠</a>
 
@@ -387,7 +435,8 @@ kbd {
       <div class="untertitel">❄️ Weihnachts-Edition ❄️</div>
       <p>Spring von Hochhaus zu Hochhaus, sammle Geschenke und weich Tauben, Robotern, Drohnen, Kisten und Laserzäunen aus. Bei den Pfeilen musst du abbiegen!</p>
       <p class="nur-pc"><kbd>←</kbd> <kbd>→</kbd> = laufen und abbiegen, <kbd>Leertaste</kbd> = springen.</p>
-      <p class="nur-handy">Tippen = springen. Finger ziehen = laufen. Schnell zur Seite wischen = abbiegen.</p>
+      <p class="nur-handy"><span class="hilfe-knoepfe">◀ ▶ = laufen und abbiegen, ⬆ = springen.</span><span class="hilfe-wischen">Tippen = springen. Ziehen = laufen und abbiegen.</span></p>
+      <div class="steuerwahl"><span>Steuerung:</span><button type="button" data-steuer="knoepfe">🎮 Knöpfe</button><button type="button" data-steuer="wischen">👆 Wischen</button></div>
       <div class="knoepfe">
         <button id="start-btn" class="go" type="button">Los geht's!</button>
         <button id="laden-btn-1" class="go gruen" type="button">🛒 Itemshop</button>
@@ -410,6 +459,7 @@ kbd {
         <button id="laden-btn-2" class="go gruen" type="button">🛒 Itemshop</button>
       </div>
       <p class="hint nur-pc">Oder <kbd>Leertaste</kbd> drücken</p>
+      <div class="steuerwahl"><span>Steuerung:</span><button type="button" data-steuer="knoepfe">🎮 Knöpfe</button><button type="button" data-steuer="wischen">👆 Wischen</button></div>
     </div>
   </div>
 
@@ -537,7 +587,7 @@ function starteCityJumper() {
   const handy = window.matchMedia("(pointer: coarse)").matches;
 
   // ===== Spielstand (wird im Browser gespeichert) =====
-  let stand = { geschenke: 0, besitz: ["flitzer", "keine"], skin: "flitzer", spur: "keine", magnetAn: true, schilde: 0, rentierStarts: 0 };
+  let stand = { geschenke: 0, besitz: ["flitzer", "keine"], skin: "flitzer", spur: "keine", magnetAn: true, schilde: 0, rentierStarts: 0, steuerung: "knoepfe" };
   let rekord = 0;
   try {
     const s = JSON.parse(localStorage.getItem(STAND_KEY) || "null");
@@ -1906,7 +1956,7 @@ function starteCityJumper() {
 
   // Abbiegen bei einer Kurve (-1 = links, 1 = rechts)
   function drehen(richtung) {
-    if (state !== "spiel" || schirmAn) return false;
+    if (state !== "spiel") return false;
     const b = gebaeude.find(g => g.ecke && g.segs[0] === pSeg && p.z <= g.z0 + 0.5 && p.z >= g.z1 - 1.5);
     if (!b) {
       // etwas zu früh gedrückt? Dann merken
@@ -2187,10 +2237,21 @@ function starteCityJumper() {
       p.x += lenk * E.seitenTempo * dt + touchDx;
       p.x = clamp(p.x, -LAUF_BREITE, LAUF_BREITE);
     }
+    // Abbiegen: auf dem Eck-Dach einfach in die Richtung lenken
+    const lenkung = (tasten.rechts ? 1 : 0) - (tasten.links ? 1 : 0) || Math.sign(touchDx);
+    if (lenkung) drehen(lenkung);
     touchDx = 0;
 
     // Vorwärts
-    const vz = anWand ? 0 : tempo * (geschleudert > 0 ? 0.35 : 1) * (schirmAn ? 0.7 : 1);
+    let schirmBremse = 0.7;
+    if (schirmAn) {
+      const Z = schirmZiel;
+      // Fallschirm über einer Kurve: der Wind dreht dich automatisch ums Eck
+      if (Z.ecke && Z.segs[0] === pSeg && p.z <= (Z.z0 + Z.z1) / 2 && p.y > Z.top) drehen(Z.ecke);
+      // über dem Ziel-Dach langsamer, damit man nicht drüber hinaus fliegt
+      if (p.z <= Z.z0 && p.z >= Z.z1 && schirmOben) schirmBremse = 0.3;
+    }
+    const vz = anWand ? 0 : tempo * (geschleudert > 0 ? 0.35 : 1) * (schirmAn ? schirmBremse : 1);
     p.z -= vz * dt;
 
     // Hoch und runter
@@ -2468,6 +2529,7 @@ function starteCityJumper() {
     stage.classList.toggle("frost", imSpiel && !!frost && !fallschirmPrompt);
     stage.classList.toggle("stern", imSpiel && !!(power && power.typ.id === "stern"));
     $("prompt").hidden = !(imSpiel && fallschirmPrompt);
+    $("pad").hidden = !(imSpiel && handy && stand.steuerung === "knoepfe");
     $("dreh").hidden = !drehHinweis() || !$("prompt").hidden;
     if (power && imSpiel) {
       $("power-chip").hidden = false;
@@ -2723,11 +2785,35 @@ function starteCityJumper() {
   });
   window.addEventListener("blur", () => { tasten.links = tasten.rechts = false; });
 
-  // Handy: tippen = springen, ziehen = laufen, schnell wischen = abbiegen
+  // Handy-Steuerung wählen: Knöpfe oder Wischen
+  const mitKnoepfen = () => handy && stand.steuerung === "knoepfe";
+  function zeigeSteuerung() {
+    document.body.dataset.steuer = stand.steuerung;
+    for (const b of document.querySelectorAll("[data-steuer]")) if (b.tagName === "BUTTON") b.setAttribute("aria-pressed", String(b.dataset.steuer === stand.steuerung));
+  }
+  for (const b of document.querySelectorAll("button[data-steuer]")) {
+    b.addEventListener("click", () => { stand.steuerung = b.dataset.steuer; speichern(); zeigeSteuerung(); });
+  }
+  zeigeSteuerung();
+
+  // Handy-Knöpfe: festhalten = laufen (und auf dem Eck-Dach abbiegen), Springen-Knopf = springen
+  function knopf(id, runter, hoch) {
+    const el = $(id);
+    el.addEventListener("pointerdown", e => { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add("gedrueckt"); runter(); });
+    const los = () => { el.classList.remove("gedrueckt"); if (hoch) hoch(); };
+    el.addEventListener("pointerup", los);
+    el.addEventListener("pointercancel", los);
+    el.addEventListener("lostpointercapture", los);
+  }
+  knopf("k-links", () => { tasten.links = true; drehen(-1); }, () => { tasten.links = false; });
+  knopf("k-rechts", () => { tasten.rechts = true; drehen(1); }, () => { tasten.rechts = false; });
+  knopf("k-sprung", () => aktion());
+
+  // Wischen: tippen = springen, ziehen = laufen, schnell wischen = abbiegen
   let zeigerX = null, wischStartX = 0, wischStartT = 0, gedreht = false;
   const flaeche = renderer.domElement;
   flaeche.addEventListener("pointerdown", e => {
-    if (state !== "spiel") return;
+    if (state !== "spiel" || mitKnoepfen()) return;
     zeigerX = wischStartX = e.clientX;
     wischStartT = performance.now();
     gedreht = false;
