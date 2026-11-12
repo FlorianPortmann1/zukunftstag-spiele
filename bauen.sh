@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 mkdir -p docs
 
-for spiel in pistenflitzer neonflug; do
+for spiel in pistenflitzer neonflug cityjumper; do
   {
     printf '%s\n' '<!doctype html>'
     printf '%s\n' '<html lang="de">'

@@ -333,6 +333,8 @@ kbd {
 </style>
 
 <div id="stage">
+  <a id="home" href="index.html" aria-label="Zurück zur Spielauswahl" title="Zurück zur Spielauswahl" hidden style="position:absolute;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(14px,env(safe-area-inset-left,0px));z-index:50;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;font-size:1.4rem;text-decoration:none;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.6)">🏠</a>
+  <script>/* Home-Knopf nur auf der Spiele-Webseite zeigen */ if (/github\.io$/.test(location.hostname) || location.protocol === "file:" || location.hostname === "localhost") document.getElementById("home").hidden = false;</script>
   <canvas id="piste" aria-label="Skipiste"></canvas>
 
   <div class="hud">
